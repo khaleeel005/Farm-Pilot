@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5001;
 
 const app = express();
 
-// Trust proxy for Railway/Heroku/etc (needed for rate limiting and IP detection)
+// Trust proxy for cloud platforms (needed for rate limiting and IP detection)
 if (!dev) {
   app.set("trust proxy", 1);
 }

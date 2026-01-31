@@ -33,7 +33,7 @@ Alternatively, you can manually set:
 
 Vercel doesn't provide built-in PostgreSQL. Use one of:
 1. **Vercel Postgres** - Vercel's managed PostgreSQL service
-2. **External PostgreSQL** - Railway, Supabase, PlanetScale, etc.
+2. **External PostgreSQL** - Supabase, PlanetScale, Neon, etc.
 
 ## Deployment Steps
 

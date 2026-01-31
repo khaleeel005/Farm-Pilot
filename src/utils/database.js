@@ -38,7 +38,7 @@ if (POSTGRES_URL) {
       },
     },
   });
-// If DATABASE_URL is provided (Railway, Heroku, etc.), use it
+// If DATABASE_URL is provided (legacy providers), use it
 } else if (DATABASE_URL) {
   sequelize = new Sequelize(DATABASE_URL, {
     dialect: "postgres",
