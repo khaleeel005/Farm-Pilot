@@ -1,4 +1,4 @@
-import { sequelize } from "./src/utils/database.js";
+import { sequelize } from "./database.js";
 import bcrypt from "bcrypt";
 import User from "./src/models/User.js";
 
