@@ -1,6 +1,6 @@
 import { sequelize } from "./database.js";
 import bcrypt from "bcrypt";
-import User from "./src/models/User.js";
+import User from "../models/User.js";
 
 /**
  * Initialize admin user if it doesn't exist
