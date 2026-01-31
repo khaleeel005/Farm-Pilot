@@ -3,6 +3,14 @@ import fs from "fs";
 import path from "path";
 import logger from "../config/logger.js";
 
+// Ensure pg package is available
+try {
+  require("pg");
+} catch (error) {
+  console.error("pg package not found. Please ensure it's installed as a dependency.");
+  throw error;
+}
+
 // Priority: Vercel Postgres -> DATABASE_URL -> Individual vars
 const POSTGRES_URL = process.env.POSTGRES_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
