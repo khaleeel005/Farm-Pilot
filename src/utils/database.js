@@ -3,19 +3,43 @@ import fs from "fs";
 import path from "path";
 import logger from "../config/logger.js";
 
+// Priority: Vercel Postgres -> DATABASE_URL -> Individual vars
+const POSTGRES_URL = process.env.POSTGRES_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
-const DB_NAME = process.env.DB_NAME || "farm_manager";
-const DB_USER = process.env.DB_USER || "aliyusani";
-const DB_PASS = process.env.DB_PASS || "aliyusani";
-const DB_HOST = process.env.DB_HOST || "127.0.0.1";
+const DB_NAME = process.env.DB_NAME || process.env.POSTGRES_DATABASE || "farm_manager";
+const DB_USER = process.env.DB_USER || process.env.POSTGRES_USER || "aliyusani";
+const DB_PASS = process.env.DB_PASS || process.env.POSTGRES_PASSWORD || "aliyusani";
+const DB_HOST = process.env.DB_HOST || process.env.POSTGRES_HOST || "127.0.0.1";
 const DB_PORT = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432;
 const DB_DIALECT = process.env.DB_DIALECT || "postgres";
 const LOG_SQL = process.env.DB_LOG === "true" || false;
 
 let sequelize;
 
+// If Vercel Postgres URL is provided, use it first
+if (POSTGRES_URL) {
+  sequelize = new Sequelize(POSTGRES_URL, {
+    dialect: "postgres",
+    logging: LOG_SQL ? (msg) => logger.debug(`[SQL] ${msg}`) : false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+    define: {
+      underscored: true,
+      timestamps: true,
+    },
+    dialectOptions: {
+      ssl: process.env.DB_SSL === "false" ? false : {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+  });
 // If DATABASE_URL is provided (Railway, Heroku, etc.), use it
-if (DATABASE_URL) {
+} else if (DATABASE_URL) {
   sequelize = new Sequelize(DATABASE_URL, {
     dialect: "postgres",
     logging: LOG_SQL ? (msg) => logger.debug(`[SQL] ${msg}`) : false,

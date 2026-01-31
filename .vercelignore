@@ -1,0 +1,26 @@
+# Test files and development dependencies
+**/*.test.js
+**/*.test.ts
+**/__tests__/
+**/coverage/
+**/node_modules/.cache/
+
+# Development logs
+*.log
+logs/
+
+# Database files (for local development)
+*.sqlite
+*.db
+
+# Environment files
+.env.local
+.env.development.local
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
