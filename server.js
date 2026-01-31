@@ -6,6 +6,7 @@ import { createServer } from "http";
 import next from "next";
 import routes from "./src/routes/index.js";
 import { autoMigrate } from "./src/utils/database.js";
+import { initializeAdmin } from "./src/utils/initAdmin.js";
 import errorHandler from "./src/middleware/errorHandler.js";
 import requestLogger from "./src/middleware/logger.js";
 import logger from "./src/config/logger.js";
@@ -94,6 +95,10 @@ app.use("/api", errorHandler);
     // Initialize database
     await autoMigrate();
     logger.info("Database migration completed.");
+    
+    // Initialize admin user
+    await initializeAdmin();
+    logger.info("Admin user initialization completed.");
 
     if (dev) {
       // Development mode: Just run Express API server

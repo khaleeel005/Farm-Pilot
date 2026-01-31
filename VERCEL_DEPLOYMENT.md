@@ -25,6 +25,10 @@ Alternatively, you can manually set:
 - `JWT_SECRET` - Secret key for JWT token signing
 - `JWT_EXPIRE` - Token expiration time (e.g., `7d`)
 
+### Admin User Configuration (Required)
+- `ADMIN_USERNAME` - Admin username
+- `ADMIN_PASSWORD` - Admin password
+
 ### Optional
 - `LOG_LEVEL` - Logging level (default: `info`)
 - `NODE_ENV` - Set automatically to `production` by Vercel
