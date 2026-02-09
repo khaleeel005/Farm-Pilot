@@ -18,7 +18,6 @@ import logger from '../src/config/logger.js';
 
 const app = express();
 const dev = false; // Always production in serverless
-const PORT = process.env.PORT || 3000;
 
 // Trust proxy for Vercel
 app.set('trust proxy', 1);
@@ -70,7 +69,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // Request logger
 app.use('/api', requestLogger);
 
-// Mount API routes
+// Mount API routes - MUST come before catch-all
 app.use('/api', routes);
 
 // Health check
@@ -79,7 +78,6 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: 'Farm Manager API is running',
     timestamp: new Date().toISOString(),
-    port: PORT,
     environment: 'production-serverless',
   });
 });
@@ -87,17 +85,12 @@ app.get('/api/health', (req, res) => {
 // API error handler
 app.use('/api', errorHandler);
 
-// Initialize Next.js
-const nextApp = next({ dev: false, dir: '.' });
-const handle = nextApp.getRequestHandler();
-
-// Prepare Next.js
+// Initialize database and admin once per serverless instance
 let initialized = false;
 
 async function initialize() {
   if (initialized) return;
-  initialized = true;
-
+  
   try {
     logger.info('Initializing serverless environment...');
     
@@ -109,21 +102,44 @@ async function initialize() {
     await initializeAdmin();
     logger.info('✓ Admin user initialization completed.');
 
-    // Prepare Next.js
-    await nextApp.prepare();
-    logger.info('✓ Next.js app prepared.');
+    initialized = true;
   } catch (err) {
     logger.error('Initialization failed:', err);
     throw err;
   }
 }
 
-// Handle all other routes with Next.js
+// Initialize Next.js for frontend routes
+const nextApp = next({ dev: false, dir: '.' });
+const handle = nextApp.getRequestHandler();
+
+let nextReady = false;
+
+async function initializeNext() {
+  if (nextReady) return;
+  try {
+    await nextApp.prepare();
+    logger.info('✓ Next.js app prepared.');
+    nextReady = true;
+  } catch (err) {
+    logger.error('Failed to initialize Next.js:', err);
+    throw err;
+  }
+}
+
+// Handle frontend requests with Next.js
 app.all('*', async (req, res) => {
-  await initialize();
-  logger.debug(`Next.js handling: ${req.method} ${req.path}`);
-  return handle(req, res);
+  try {
+    await initialize();
+    await initializeNext();
+    return handle(req, res);
+  } catch (err) {
+    logger.error(`Error handling ${req.method} ${req.path}:`, err);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Internal Server Error' },
+    });
+  }
 });
 
-// Default export for Vercel
-export default app;
+// Export handler for Vercel
