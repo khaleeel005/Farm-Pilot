@@ -112,13 +112,27 @@ if (POSTGRES_URL) {
 
 export async function connect() {
   try {
+    logger.info('Connecting to database...');
+    logger.debug('Database configuration:', {
+      dialect: DB_DIALECT,
+      host: DB_HOST,
+      port: DB_PORT,
+      database: DB_NAME,
+      hasPOSTGRES_URL: !!POSTGRES_URL,
+      hasDATABASE_URL: !!DATABASE_URL,
+    });
+    
     await sequelize.authenticate();
     if (process.env.NODE_ENV !== 'test') {
-      logger.info('Database connected successfully.');
+      logger.info('✓ Database connected successfully.');
     }
     return true;
   } catch (err) {
-    logger.error('Database connection failed:', err);
+    logger.error('Database connection failed:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+    });
     throw err;
   }
 }
@@ -127,21 +141,18 @@ export function close() {
   return sequelize.close();
 }
 
-export function initModels(modelsDir = path.join(__dirname, '..', 'models')) {
+export function initModels(modelsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'models')) {
   const models = {};
   if (!fs.existsSync(modelsDir)) return models;
 
   fs.readdirSync(modelsDir)
-    .filter((f) => f.endsWith('.js'))
+    .filter((f) => f.endsWith('.js') && f !== 'associations.js')
     .forEach((file) => {
       const modelPath = path.join(modelsDir, file);
-      const model = require(modelPath)(sequelize, Sequelize.DataTypes);
-      models[model.name] = model;
+      // For ES modules, dynamic import is needed but must be handled differently
+      // For now, models should be imported directly in associations.js
+      logger.debug(`Model file found: ${file}`);
     });
-
-  Object.values(models)
-    .filter((m) => typeof m.associate === 'function')
-    .forEach((m) => m.associate(models));
 
   return models;
 }

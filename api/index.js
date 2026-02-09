@@ -87,12 +87,20 @@ app.use('/api', errorHandler);
 
 // Initialize database and admin once per serverless instance
 let initialized = false;
+let initError = null;
 
 async function initialize() {
   if (initialized) return;
+  if (initError) throw initError;
 
   try {
     logger.info('Initializing serverless environment...');
+    logger.debug('Database config:', {
+      hasPOSTGRES_URL: !!process.env.POSTGRES_URL,
+      hasDATABASE_URL: !!process.env.DATABASE_URL,
+      DB_NAME: process.env.DB_NAME || 'farm_manager',
+      DB_HOST: process.env.DB_HOST || '127.0.0.1',
+    });
 
     // Initialize database
     await autoMigrate();
@@ -104,7 +112,12 @@ async function initialize() {
 
     initialized = true;
   } catch (err) {
-    logger.error('Initialization failed:', err);
+    initError = err;
+    logger.error('Initialization failed:', {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+    });
     throw err;
   }
 }
