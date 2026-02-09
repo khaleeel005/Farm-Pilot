@@ -1,18 +1,23 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // Proxy API requests to Express backend during development
+  // Proxy API requests to Express backend during development only
   async rewrites() {
-    // Only rewrite for development - production uses same origin
+    // Development mode: Next.js runs on port 3000, Express API on port 5001
     if (process.env.NODE_ENV === 'development') {
-      return [
-        {
-          source: '/api/:path*',
-          destination: 'http://localhost:5001/api/:path*',
-        },
-      ];
+      return {
+        beforeFiles: [
+          {
+            source: '/api/:path*',
+            destination: 'http://localhost:5001/api/:path*',
+          },
+        ],
+      };
     }
-    return [];
+    // Production: Don't rewrite - Express handles /api routes directly
+    return {
+      beforeFiles: [],
+    };
   },
 };
 

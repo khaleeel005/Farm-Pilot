@@ -130,8 +130,9 @@ app.use('/api', errorHandler);
       await nextApp.prepare();
       logger.info('✓ Next.js app prepared for production.');
 
-      // Let Next.js handle all non-API routes
+      // Let Next.js handle all non-API routes (after API routes)
       app.all('*', (req, res) => {
+        logger.debug(`Next.js handling: ${req.method} ${req.path}`);
         return handle(req, res);
       });
 
