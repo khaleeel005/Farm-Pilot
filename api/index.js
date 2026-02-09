@@ -90,10 +90,10 @@ let initialized = false;
 
 async function initialize() {
   if (initialized) return;
-  
+
   try {
     logger.info('Initializing serverless environment...');
-    
+
     // Initialize database
     await autoMigrate();
     logger.info('✓ Database migration completed.');
@@ -143,3 +143,4 @@ app.all('*', async (req, res) => {
 });
 
 // Export handler for Vercel
+export default app;
