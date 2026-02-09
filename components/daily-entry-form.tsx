@@ -131,7 +131,7 @@ export function DailyEntryForm() {
         );
       }
     }
-  }, [batchUsageStats, formData.feedBatchId]);
+  }, [batchUsageStats, formData.feedBatchId, toast]);
 
   const handleFeedBagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -586,12 +586,12 @@ export function DailyEntryForm() {
                   {submitting
                     ? 'Submitting...'
                     : !isFormValid()
-                    ? feedBagsError
-                      ? 'Fix Feed Bags Error to Submit'
-                      : !selectedHouse
-                      ? 'Select a House to Submit'
-                      : 'Fix Errors to Submit'
-                    : 'Submit Daily Entry'}
+                      ? feedBagsError
+                        ? 'Fix Feed Bags Error to Submit'
+                        : !selectedHouse
+                          ? 'Select a House to Submit'
+                          : 'Fix Errors to Submit'
+                      : 'Submit Daily Entry'}
                 </Button>
               </form>
             </CardContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,19 +97,15 @@ export function ExpenseManagement({ userRole = 'owner' }: ExpenseManagementProps
     }
   };
 
-  useEffect(() => {
-    loadCostData();
-  }, [currentMonthRange.startDate, currentMonthRange.endDate]);
-
-  const loadCostData = async () => {
+  const loadCostData = useCallback(async () => {
     try {
       setLoading(true);
       const [typesRes, entriesRes] = await Promise.all([
-        getCostTypes(), 
+        getCostTypes(),
         getCostEntries({
           startDate: currentMonthRange.startDate,
           endDate: currentMonthRange.endDate,
-        })
+        }),
       ]);
 
       if (typesRes) {
@@ -121,12 +117,12 @@ export function ExpenseManagement({ userRole = 'owner' }: ExpenseManagementProps
 
       if (entriesRes) {
         // API returns { success, data: { costEntries, pagination } }
-        type EntriesResponse = { 
-          data?: { costEntries?: CostEntry[] }; 
+        type EntriesResponse = {
+          data?: { costEntries?: CostEntry[] };
           costEntries?: CostEntry[];
         };
         const response = entriesRes as EntriesResponse;
-        
+
         let entries: CostEntry[] = [];
         if (response?.data?.costEntries && Array.isArray(response.data.costEntries)) {
           entries = response.data.costEntries;
@@ -144,7 +140,11 @@ export function ExpenseManagement({ userRole = 'owner' }: ExpenseManagementProps
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentMonthRange.startDate, currentMonthRange.endDate]);
+
+  useEffect(() => {
+    loadCostData();
+  }, [loadCostData]);
 
   const mockExpenses = costEntries.map((entry) => ({
     id: entry.id,

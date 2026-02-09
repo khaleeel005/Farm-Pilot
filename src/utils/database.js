@@ -121,7 +121,7 @@ export async function connect() {
       hasPOSTGRES_URL: !!POSTGRES_URL,
       hasDATABASE_URL: !!DATABASE_URL,
     });
-    
+
     await sequelize.authenticate();
     if (process.env.NODE_ENV !== 'test') {
       logger.info('✓ Database connected successfully.');
@@ -141,7 +141,9 @@ export function close() {
   return sequelize.close();
 }
 
-export function initModels(modelsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'models')) {
+export function initModels(
+  modelsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'models')
+) {
   const models = {};
   if (!fs.existsSync(modelsDir)) return models;
 
@@ -167,23 +169,31 @@ export async function autoMigrate() {
   }
 
   try {
+    logger.info('Starting database migration...');
+
+    // First, authenticate the database connection
+    await sequelize.authenticate();
+    logger.info('✓ Database connection authenticated.');
+
     // Import associations to set up model relationships
+    logger.debug('Loading model associations...');
     await import('../models/associations.js');
+    logger.debug('✓ Model associations loaded.');
 
     if (process.env.USE_MIGRATIONS === 'true') {
       try {
         const { execSync } = await import('child_process');
-        if (process.env.NODE_ENV !== 'test') {
-          logger.info('Running migrations via sequelize-cli...');
-        }
+        logger.info('Running migrations via sequelize-cli...');
         execSync('npx sequelize db:migrate', { stdio: 'inherit' });
-        if (process.env.NODE_ENV !== 'test') {
-          logger.info('Migrations completed.');
-        }
+        logger.info('✓ Migrations completed successfully.');
         migrationComplete = true;
         return;
       } catch (mErr) {
-        logger.error('Failed to run sequelize migrations:', mErr);
+        logger.error('Failed to run sequelize migrations:', {
+          message: mErr.message,
+          code: mErr.code,
+        });
+        logger.info('Falling back to sequelize.sync...');
       }
     }
 
@@ -191,17 +201,26 @@ export async function autoMigrate() {
     // For production (postgres), use alter: true to preserve data
     const isTestEnv = process.env.NODE_ENV === 'test';
     const isSqlite = sequelize.getDialect() === 'sqlite';
+    const dialect = sequelize.getDialect();
+
+    logger.info(`Syncing database with sequelize (dialect: ${dialect})...`);
 
     if (isTestEnv && isSqlite) {
+      logger.debug('Using force: true for test SQLite environment');
       await sequelize.sync({ force: true });
     } else {
+      logger.debug('Using alter: true for production environment');
       await sequelize.sync({ alter: true });
     }
 
+    logger.info('✓ Database synchronized successfully.');
     migrationComplete = true;
-    // Database synchronized successfully (logging disabled for tests)
   } catch (err) {
-    console.error('Database synchronization failed:', err);
+    logger.error('Database synchronization failed:', {
+      message: err.message,
+      code: err.code,
+      stack: err.stack,
+    });
     throw err;
   }
 }

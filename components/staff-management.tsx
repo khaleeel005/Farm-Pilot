@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { listStaff, createStaff, deleteStaff, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +40,7 @@ export function StaffManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   type Staff = {
     id: number;
     username?: string;
@@ -58,11 +58,7 @@ export function StaffManagement() {
 
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
 
-  useEffect(() => {
-    loadStaff();
-  }, []);
-
-  const loadStaff = async () => {
+  const loadStaff = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -75,7 +71,9 @@ export function StaffManagement() {
       console.error('Failed to load staff', err);
       if (err instanceof ApiError) {
         if (err.isForbidden) {
-          setError('You do not have permission to manage staff. Only owners can access this feature.');
+          setError(
+            'You do not have permission to manage staff. Only owners can access this feature.'
+          );
         } else if (err.isUnauthorized) {
           setError('Please log in to access staff management.');
         } else {
@@ -87,7 +85,11 @@ export function StaffManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStaff();
+  }, [loadStaff]);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ username: '', password: '' });
 
@@ -122,13 +124,7 @@ export function StaffManagement() {
   }
 
   if (error) {
-    return (
-      <ErrorState
-        title="Unable to load staff"
-        message={error}
-        onRetry={loadStaff}
-      />
-    );
+    return <ErrorState title="Unable to load staff" message={error} onRetry={loadStaff} />;
   }
 
   return (
@@ -288,8 +284,12 @@ export function StaffManagement() {
           {filteredStaff.length === 0 ? (
             <EmptyState
               variant="staff"
-              title={searchTerm ? "No matching staff" : "No staff members"}
-              description={searchTerm ? "Try adjusting your search term" : "Add your first staff member to get started"}
+              title={searchTerm ? 'No matching staff' : 'No staff members'}
+              description={
+                searchTerm
+                  ? 'Try adjusting your search term'
+                  : 'Add your first staff member to get started'
+              }
             />
           ) : (
             <Table>

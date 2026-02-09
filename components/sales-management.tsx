@@ -1,18 +1,31 @@
-"use client"
+'use client';
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DollarSign, Users, Plus } from "lucide-react"
-import { getSales, getCustomers, createSale, createCustomer } from "@/lib/api"
-import { Sale, Customer, SalePayload, CustomerPayload } from "@/types"
-import { useResourcePermissions, useToastContext } from "@/hooks"
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { DollarSign, Users, Plus } from 'lucide-react';
+import { getSales, getCustomers, createSale, createCustomer } from '@/lib/api';
+import { Sale, Customer, SalePayload, CustomerPayload } from '@/types';
+import { useResourcePermissions, useToastContext } from '@/hooks';
 import {
   Dialog,
   DialogContent,
@@ -20,19 +33,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { LoadingSpinner } from "@/components/shared/loading-spinner"
-import { EmptyState } from "@/components/shared/empty-state"
-import { PageHeader } from "@/components/shared/page-header"
+} from '@/components/ui/dialog';
+import { LoadingSpinner } from '@/components/shared/loading-spinner';
+import { EmptyState } from '@/components/shared/empty-state';
+import { PageHeader } from '@/components/shared/page-header';
 
 export function SalesManagement() {
-  const [showNewSale, setShowNewSale] = useState(false)
-  const [showNewCustomer, setShowNewCustomer] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [sales, setSales] = useState<Sale[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const toast = useToastContext()
+  const [showNewSale, setShowNewSale] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const toast = useToastContext();
 
   // Permission checks
   const { canCreate: canCreateSale } = useResourcePermissions('SALES');
@@ -47,63 +60,63 @@ export function SalesManagement() {
     paymentMethod: '',
     paymentStatus: 'pending',
     notes: '',
-  })
+  });
 
-  // Customer form state  
+  // Customer form state
   const [customerForm, setCustomerForm] = useState({
     name: '',
     phone: '',
     email: '',
     address: '',
     customerType: 'individual',
-  })
+  });
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      setLoading(true)
+      setLoading(true);
       const [salesData, customersData] = await Promise.all([
         getSales().catch(() => []),
         getCustomers().catch(() => []),
-      ])
-      setSales(Array.isArray(salesData) ? salesData : [])
-      setCustomers(Array.isArray(customersData) ? customersData : [])
+      ]);
+      setSales(Array.isArray(salesData) ? salesData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
     } catch (err) {
-      console.error('Failed to load data:', err)
-      toast.error('Failed to load sales data')
+      console.error('Failed to load data:', err);
+      toast.error('Failed to load sales data');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const calculateTotal = () => {
-    const quantity = parseFloat(saleForm.quantity) || 0
-    const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0
-    
-    return quantity * pricePerEgg
-  }
+    const quantity = parseFloat(saleForm.quantity) || 0;
+    const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0;
+
+    return quantity * pricePerEgg;
+  };
 
   const handleCreateSale = async () => {
     if (!saleForm.customerId) {
-      toast.error('Please select a customer')
-      return
+      toast.error('Please select a customer');
+      return;
     }
 
-    const quantity = parseFloat(saleForm.quantity) || 0
+    const quantity = parseFloat(saleForm.quantity) || 0;
 
     if (quantity === 0) {
-      toast.error('Please enter egg quantity')
-      return
+      toast.error('Please enter egg quantity');
+      return;
     }
 
     try {
-      setSubmitting(true)
-      
-      const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0
-      const totalAmount = calculateTotal()
+      setSubmitting(true);
+
+      const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0;
+      const totalAmount = calculateTotal();
 
       const payload: SalePayload = {
         customerId: parseInt(saleForm.customerId),
@@ -112,12 +125,16 @@ export function SalesManagement() {
         pricePerEgg,
         totalAmount,
         paymentStatus: saleForm.paymentStatus as 'paid' | 'pending',
-        paymentMethod: (saleForm.paymentMethod || undefined) as 'cash' | 'transfer' | 'check' | undefined,
-      }
+        paymentMethod: (saleForm.paymentMethod || undefined) as
+          | 'cash'
+          | 'transfer'
+          | 'check'
+          | undefined,
+      };
 
-      await createSale(payload)
-      toast.success('Sale recorded successfully!')
-      
+      await createSale(payload);
+      toast.success('Sale recorded successfully!');
+
       // Reset form and reload data
       setSaleForm({
         customerId: '',
@@ -127,36 +144,36 @@ export function SalesManagement() {
         paymentMethod: '',
         paymentStatus: 'pending',
         notes: '',
-      })
-      setShowNewSale(false)
-      loadData()
+      });
+      setShowNewSale(false);
+      loadData();
     } catch (err) {
-      console.error('Failed to create sale:', err)
-      toast.error('Failed to record sale. Please try again.')
+      console.error('Failed to create sale:', err);
+      toast.error('Failed to record sale. Please try again.');
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleCreateCustomer = async () => {
     if (!customerForm.name.trim()) {
-      toast.error('Customer name is required')
-      return
+      toast.error('Customer name is required');
+      return;
     }
 
     try {
-      setSubmitting(true)
-      
+      setSubmitting(true);
+
       const payload: CustomerPayload = {
         customerName: customerForm.name.trim(),
         phone: customerForm.phone || undefined,
         email: customerForm.email || undefined,
         address: customerForm.address || undefined,
-      }
+      };
 
-      await createCustomer(payload)
-      toast.success('Customer created successfully!')
-      
+      await createCustomer(payload);
+      toast.success('Customer created successfully!');
+
       // Reset form and reload customers
       setCustomerForm({
         name: '',
@@ -164,32 +181,32 @@ export function SalesManagement() {
         email: '',
         address: '',
         customerType: 'individual',
-      })
-      setShowNewCustomer(false)
-      
+      });
+      setShowNewCustomer(false);
+
       // Reload customers
-      const customersData = await getCustomers()
-      setCustomers(Array.isArray(customersData) ? customersData : [])
+      const customersData = await getCustomers();
+      setCustomers(Array.isArray(customersData) ? customersData : []);
     } catch (err) {
-      console.error('Failed to create customer:', err)
-      toast.error('Failed to create customer. Please try again.')
+      console.error('Failed to create customer:', err);
+      toast.error('Failed to create customer. Please try again.');
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   // Calculate summary stats
-  const today = new Date().toISOString().split('T')[0]
-  const todaySales = sales.filter(s => s.saleDate === today)
-  const todayTotal = todaySales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0)
-  const todayEggs = todaySales.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0)
+  const today = new Date().toISOString().split('T')[0];
+  const todaySales = sales.filter((s) => s.saleDate === today);
+  const todayTotal = todaySales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
+  const todayEggs = todaySales.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
   const pendingPayments = sales
-    .filter(s => s.paymentStatus === 'pending')
-    .reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0)
-  const pendingCount = sales.filter(s => s.paymentStatus === 'pending').length
+    .filter((s) => s.paymentStatus === 'pending')
+    .reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
+  const pendingCount = sales.filter((s) => s.paymentStatus === 'pending').length;
 
   if (loading) {
-    return <LoadingSpinner fullPage message="Loading sales data..." />
+    return <LoadingSpinner fullPage message="Loading sales data..." />;
   }
 
   // Build header actions
@@ -208,7 +225,7 @@ export function SalesManagement() {
         </Button>
       )}
     </div>
-  )
+  );
 
   return (
     <div className="space-y-6">
@@ -231,7 +248,7 @@ export function SalesManagement() {
               <Label>Customer Name *</Label>
               <Input
                 value={customerForm.name}
-                onChange={(e) => setCustomerForm(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Enter customer name"
               />
             </div>
@@ -240,15 +257,17 @@ export function SalesManagement() {
                 <Label>Phone</Label>
                 <Input
                   value={customerForm.phone}
-                  onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
                   placeholder="+234 xxx xxx xxxx"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Customer Type</Label>
-                <Select 
+                <Select
                   value={customerForm.customerType}
-                  onValueChange={(value) => setCustomerForm(prev => ({ ...prev, customerType: value }))}
+                  onValueChange={(value) =>
+                    setCustomerForm((prev) => ({ ...prev, customerType: value }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -265,7 +284,7 @@ export function SalesManagement() {
               <Input
                 type="email"
                 value={customerForm.email}
-                onChange={(e) => setCustomerForm(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, email: e.target.value }))}
                 placeholder="email@example.com"
               />
             </div>
@@ -273,7 +292,7 @@ export function SalesManagement() {
               <Label>Address</Label>
               <Input
                 value={customerForm.address}
-                onChange={(e) => setCustomerForm(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(e) => setCustomerForm((prev) => ({ ...prev, address: e.target.value }))}
                 placeholder="Customer address"
               />
             </div>
@@ -320,7 +339,9 @@ export function SalesManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₦{pendingPayments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{pendingCount} transaction{pendingCount !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {pendingCount} transaction{pendingCount !== 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
 
@@ -350,7 +371,9 @@ export function SalesManagement() {
                   <Label htmlFor="customer">Customer *</Label>
                   <Select
                     value={saleForm.customerId}
-                    onValueChange={(value) => setSaleForm(prev => ({ ...prev, customerId: value }))}
+                    onValueChange={(value) =>
+                      setSaleForm((prev) => ({ ...prev, customerId: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
@@ -366,10 +389,10 @@ export function SalesManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="date">Sale Date</Label>
-                  <Input 
-                    type="date" 
+                  <Input
+                    type="date"
                     value={saleForm.saleDate}
-                    onChange={(e) => setSaleForm(prev => ({ ...prev, saleDate: e.target.value }))}
+                    onChange={(e) => setSaleForm((prev) => ({ ...prev, saleDate: e.target.value }))}
                   />
                 </div>
               </div>
@@ -382,20 +405,24 @@ export function SalesManagement() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Quantity (eggs)</Label>
-                    <Input 
-                      type="number" 
-                      placeholder="0" 
+                    <Input
+                      type="number"
+                      placeholder="0"
                       value={saleForm.quantity}
-                      onChange={(e) => setSaleForm(prev => ({ ...prev, quantity: e.target.value }))}
+                      onChange={(e) =>
+                        setSaleForm((prev) => ({ ...prev, quantity: e.target.value }))
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Price per Egg (₦)</Label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       placeholder="0"
                       value={saleForm.pricePerEgg}
-                      onChange={(e) => setSaleForm(prev => ({ ...prev, pricePerEgg: e.target.value }))}
+                      onChange={(e) =>
+                        setSaleForm((prev) => ({ ...prev, pricePerEgg: e.target.value }))
+                      }
                     />
                   </div>
                 </div>
@@ -412,7 +439,9 @@ export function SalesManagement() {
                   <Label>Payment Method</Label>
                   <Select
                     value={saleForm.paymentMethod}
-                    onValueChange={(value) => setSaleForm(prev => ({ ...prev, paymentMethod: value }))}
+                    onValueChange={(value) =>
+                      setSaleForm((prev) => ({ ...prev, paymentMethod: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select method" />
@@ -428,7 +457,9 @@ export function SalesManagement() {
                   <Label>Payment Status</Label>
                   <Select
                     value={saleForm.paymentStatus}
-                    onValueChange={(value) => setSaleForm(prev => ({ ...prev, paymentStatus: value }))}
+                    onValueChange={(value) =>
+                      setSaleForm((prev) => ({ ...prev, paymentStatus: value }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -454,7 +485,7 @@ export function SalesManagement() {
         )}
 
         {/* Recent Sales */}
-        <Card className={showNewSale ? "lg:col-span-1" : "lg:col-span-3"}>
+        <Card className={showNewSale ? 'lg:col-span-1' : 'lg:col-span-3'}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -478,21 +509,25 @@ export function SalesManagement() {
                 </TableHeader>
                 <TableBody>
                   {sales.slice(0, 10).map((sale) => {
-                    const totalEggs = Number(sale.quantity) || 0
+                    const totalEggs = Number(sale.quantity) || 0;
                     return (
                       <TableRow key={sale.id}>
                         <TableCell className="font-medium">#{sale.id}</TableCell>
                         <TableCell>{sale.customer?.customerName || 'Unknown'}</TableCell>
                         <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
-                        <TableCell>{totalEggs} ({Math.floor(totalEggs / 12)} dz)</TableCell>
+                        <TableCell>
+                          {totalEggs} ({Math.floor(totalEggs / 12)} dz)
+                        </TableCell>
                         <TableCell>₦{Number(sale.totalAmount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge variant={sale.paymentStatus === "paid" ? "default" : "destructive"}>
+                          <Badge
+                            variant={sale.paymentStatus === 'paid' ? 'default' : 'destructive'}
+                          >
                             {sale.paymentStatus}
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    )
+                    );
                   })}
                 </TableBody>
               </Table>
@@ -501,7 +536,7 @@ export function SalesManagement() {
                 variant="sales"
                 title="No sales recorded yet"
                 description="Click 'New Sale' to record your first sale."
-                actionLabel={canCreateSale ? "New Sale" : undefined}
+                actionLabel={canCreateSale ? 'New Sale' : undefined}
                 onAction={canCreateSale ? () => setShowNewSale(true) : undefined}
               />
             )}
@@ -536,12 +571,12 @@ export function SalesManagement() {
               variant="customers"
               title="No customers registered yet"
               description="Click 'Add Customer' to add your first customer."
-              actionLabel={canCreateCustomer ? "Add Customer" : undefined}
+              actionLabel={canCreateCustomer ? 'Add Customer' : undefined}
               onAction={canCreateCustomer ? () => setShowNewCustomer(true) : undefined}
             />
           )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
