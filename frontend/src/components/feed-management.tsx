@@ -37,7 +37,7 @@ import {
   getFeedBatchUsageStats,
   deleteFeedBatch,
 } from "@/lib/api";
-import { FeedBatch, Ingredient, BatchUsageStats } from "@/types";
+import type { FeedBatch, Ingredient, BatchUsageStats } from "@/types";
 import { useResourcePermissions, useToastContext } from "@/hooks";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
