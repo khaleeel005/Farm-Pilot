@@ -1,0 +1,36 @@
+# Frontend .gitignore
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build output
+dist/
+.rsbuild/
+
+# TanStack Router generated files
+src/routeTree.gen.ts
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/

@@ -1,15 +1,11 @@
+# Root .gitignore
+
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
+package-lock.json
+pnpm-lock.yaml
 
-# Build outputs
-.next/
-out/
-dist/
-build/
-
-# Environment files
+# Environment
 .env
 .env.local
 .env.*.local
@@ -18,32 +14,32 @@ build/
 logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Testing
-coverage/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+pnpm-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs (handled by subdirectories)
+dist/
+build/
+.rsbuild/
+.next/
+
 # TypeScript
 *.tsbuildinfo
-next-env.d.ts
+
+# Testing
+coverage/
 
 # Misc
-*.pem
-
-# Vercel
 .vercel
-
-# Old directories (can be removed after consolidation is verified)
-# farm-pilot/
-# backend/
+.vercelignore
+vercel.json

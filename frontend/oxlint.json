@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "react/jsx-key": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/no-children-prop": "error",
+    "react/no-danger": "warn",
+    "react/no-deprecated": "error",
+    "react/no-unescaped-entities": "error",
+    "react/react-in-jsx-scope": "off",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-unused-vars": "error",
+    "typescript/prefer-as-const": "error"
+  },
+  "env": {
+    "browser": true,
+    "es2021": true
+  }
+}
