@@ -1,8 +1,8 @@
-import { autoMigrate, sequelize } from "../../../src/utils/database.js";
-import LaborerModel from "../../../src/models/Laborer.js";
-import WorkAssignmentModel from "../../../src/models/WorkAssignment.js";
-import PayrollModel from "../../../src/models/Payroll.js";
-import laborService from "../../../src/services/laborService.js";
+import { autoMigrate, sequelize } from "../../../dist/utils/database.js";
+import LaborerModel from "../../../dist/models/Laborer.js";
+import WorkAssignmentModel from "../../../dist/models/WorkAssignment.js";
+import PayrollModel from "../../../dist/models/Payroll.js";
+import laborService from "../../../dist/services/laborService.js";
 
 beforeAll(async () => {
   await autoMigrate();

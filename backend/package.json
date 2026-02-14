@@ -8,7 +8,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "NODE_ENV=test DB_DIALECT=sqlite DB_STORAGE=\":memory:\" NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest",
+    "test": "pnpm build && NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --disable-warning=ExperimentalWarning' jest --watchman=false --runInBand",
+    "db:up": "docker compose --env-file .env up -d",
+    "db:down": "docker compose --env-file .env down",
+    "db:logs": "docker compose --env-file .env logs -f postgres",
     "db:migrate": "sequelize db:migrate",
     "db:migrate:undo": "sequelize db:migrate:undo",
     "typecheck": "tsc --noEmit"

@@ -3,7 +3,7 @@ import {
   sequelize,
   initModels,
   autoMigrate,
-} from "../../src/utils/database.js";
+} from "../../dist/utils/database.js";
 import app from "../../testApp.js";
 
 // Full flow integration test: login -> house -> recipe -> batch -> ingredient -> daily log -> operating cost -> cost calculation
@@ -11,10 +11,10 @@ import app from "../../testApp.js";
 beforeAll(async () => {
   await autoMigrate();
   // create an admin user directly for tests
-  const { default: User } = await import("../../src/models/User.js");
+  const { default: User } = await import("../../dist/models/User.js");
   const bcrypt = await import("bcrypt");
   const hash = await bcrypt.hash("admin123", 10);
-  await User.create({ username: "admin", password: hash, role: "Owner" });
+  await User.create({ username: "admin", password: hash, role: "owner" });
 });
 
 afterAll(async () => {
@@ -113,6 +113,7 @@ describe("Complete Farm Management Flow", () => {
       logDate: "2025-08-26",
       houseId: houseId,
       eggsCollected: 125,
+      feedBatchId: batchId,
       feedBagsUsed: 2, // Using bags instead of kg
       mortalityCount: 2,
       notes: "Integration test log",

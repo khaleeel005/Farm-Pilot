@@ -1,6 +1,6 @@
 import request from "supertest";
 import app from "../../../testApp.js";
-import { autoMigrate, sequelize } from "../../../src/utils/database.js";
+import { autoMigrate, sequelize } from "../../../dist/utils/database.js";
 import bcrypt from "bcrypt";
 
 describe("POST /api/feed/batches/estimate", () => {
@@ -10,7 +10,7 @@ describe("POST /api/feed/batches/estimate", () => {
     await autoMigrate();
 
     // Create owner user for authentication
-    const { default: User } = await import("../../../src/models/User.js");
+    const { default: User } = await import("../../../dist/models/User.js");
     const hash = await bcrypt.hash("owner123", 10);
     await User.create({
       username: "testowner",

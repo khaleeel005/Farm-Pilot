@@ -1,5 +1,5 @@
 import request from "supertest";
-import { sequelize, autoMigrate } from "../../src/utils/database.js";
+import { sequelize, autoMigrate } from "../../dist/utils/database.js";
 import app from "../../testApp.js";
 import bcrypt from "bcrypt";
 
@@ -13,13 +13,13 @@ describe("Feed Management Flow", () => {
     await autoMigrate();
 
     // Create test users
-    const { default: User } = await import("../../src/models/User.js");
+    const { default: User } = await import("../../dist/models/User.js");
 
     const ownerHash = await bcrypt.hash("owner123", 10);
     await User.create({
       username: "testowner",
       password: ownerHash,
-      role: "Owner",
+      role: "owner",
       fullName: "Test Owner",
     });
 
@@ -104,7 +104,10 @@ describe("Feed Management Flow", () => {
     expect([200, 404]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       expect(res.body.data.recipeName).toBe("Layer Starter Mix");
-      expect(res.body.data.cornPercent).toBe(45.5);
+      expect(Number.parseFloat(String(res.body.data.cornPercent))).toBeCloseTo(
+        45.5,
+        2
+      );
     }
   });
 

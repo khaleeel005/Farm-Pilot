@@ -47,8 +47,7 @@ import {
   BatchUsageStats,
 } from "@/types";
 import { FeedBatch } from "@/types/entities/feed";
-import { useToast } from "@/hooks";
-import { ToastContainer } from "@/components/ui/toast";
+import { useToastContext } from "@/hooks";
 
 // Local worker type for this component
 interface Worker {
@@ -64,7 +63,7 @@ export function DailyEntryForm() {
   const [houses, setHouses] = useState<House[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const toast = useToast();
+  const toast = useToastContext();
 
   // Feed batch state
   const [feedBatches, setFeedBatches] = useState<FeedBatch[]>([]);
@@ -178,30 +177,33 @@ export function DailyEntryForm() {
   };
 
   useEffect(() => {
-    loadData();
-  }, [houses.length, batchUsageStats.length, todaySummary.housesLogged]); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadData();
+  }, []);
 
   const loadData = async () => {
-    await Promise.all([loadHouses(), loadTodaysSummary(), loadWorkers()]);
-    // Load alerts after other data is available
-    loadAlerts();
-  };
-
-  const loadHouses = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await getHouses();
-      if (response) {
-        setHouses(response);
-      }
-    } catch (error) {
-      console.error("Failed to load houses:", error);
+      const [housesData] = await Promise.all([loadHouses(), loadWorkers()]);
+      await loadTodaysSummary(housesData.length);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadTodaysSummary = async () => {
+  const loadHouses = async (): Promise<House[]> => {
+    try {
+      const response = await getHouses();
+      const nextHouses = Array.isArray(response) ? response : [];
+      setHouses(nextHouses);
+      return nextHouses;
+    } catch (error) {
+      console.error("Failed to load houses:", error);
+      setHouses([]);
+      return [];
+    }
+  };
+
+  const loadTodaysSummary = async (totalHouses: number) => {
     try {
       const today = new Date().toISOString().split("T")[0];
       const todaysLogs = await getDailyLogs({ date: today });
@@ -225,7 +227,7 @@ export function DailyEntryForm() {
       setTodaySummary({
         totalEggs,
         housesLogged: houseBreakdown.length,
-        totalHouses: houses.length || 0,
+        totalHouses,
         houseBreakdown,
       });
     } catch (error) {
@@ -267,7 +269,7 @@ export function DailyEntryForm() {
     }
   };
 
-  const loadAlerts = async () => {
+  const loadAlerts = () => {
     try {
       const alertMessages: string[] = [];
 
@@ -307,6 +309,10 @@ export function DailyEntryForm() {
       console.error("Failed to load alerts:", error);
     }
   };
+
+  useEffect(() => {
+    loadAlerts();
+  }, [batchUsageStats, todaySummary]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -348,8 +354,8 @@ export function DailyEntryForm() {
         });
         setSelectedHouse("");
         // Refresh data after successful submission
-        loadTodaysSummary();
-        loadFeedBatches(); // Refresh feed batch stats to show updated usage
+        await loadTodaysSummary(houses.length);
+        await loadFeedBatches(); // Refresh feed batch stats to show updated usage
       } else {
         toast.error("Failed to submit daily log. Please try again.");
       }
@@ -378,8 +384,6 @@ export function DailyEntryForm() {
 
   return (
     <div className="space-y-6">
-      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
-
       <div className="flex flex-col gap-2">
         <h2 className="text-2xl sm:text-3xl font-bold text-balance">
           Daily Entry

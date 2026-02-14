@@ -1,4 +1,5 @@
 import { body, validationResult } from "express-validator";
+import type { NextFunction, Request, Response } from "express";
 import { CostTypes } from "../models/CostEntry.js";
 
 export const validateCostEntry = [
@@ -53,14 +54,15 @@ export const validateCostEntry = [
     .isInt({ min: 1 })
     .withMessage("House ID must be a positive integer"),
 
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Validation failed",
         errors: errors.array(),
       });
+      return;
     }
     next();
   },
@@ -122,14 +124,15 @@ export const validateCostEntryUpdate = [
     .isInt({ min: 1 })
     .withMessage("House ID must be a positive integer"),
 
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Validation failed",
         errors: errors.array(),
       });
+      return;
     }
     next();
   },

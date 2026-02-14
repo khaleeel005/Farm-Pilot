@@ -29,13 +29,22 @@ Standalone Express + TypeScript API server for Farm Manager application.
 
    ```bash
    cp .env.example .env
-   # Edit .env with your database credentials and secrets
+   # Edit .env with required values
    ```
 
-3. **Run database migrations**:
+   For test-specific overrides, create `./.env.test` from `./.env.test.example`.
+
+3. **Start PostgreSQL (Docker)**:
+   ```bash
+   pnpm db:up
+   ```
+
+4. **Run database migrations**:
    ```bash
    pnpm db:migrate
    ```
+
+   In non-production environments, the app can still create/update tables on startup via Sequelize `sync({ alter: true })`.
 
 ## Development
 
@@ -45,7 +54,7 @@ Start the development server with hot reload:
 pnpm dev
 ```
 
-The API will be available at `http://localhost:5001`
+The API will be available on the host/port you configure in `PORT`.
 
 ## Production
 
@@ -68,6 +77,9 @@ pnpm start
 - `pnpm start` - Run production server
 - `pnpm test` - Run tests
 - `pnpm typecheck` - Check TypeScript types without emitting
+- `pnpm db:up` - Start local PostgreSQL container
+- `pnpm db:down` - Stop local PostgreSQL container
+- `pnpm db:logs` - Tail PostgreSQL logs
 - `pnpm db:migrate` - Run database migrations
 - `pnpm db:migrate:undo` - Rollback last migration
 
@@ -125,13 +137,15 @@ All endpoints are prefixed with `/api`
 
 See `.env.example` for all available configuration options.
 
-Key variables:
+Required variables:
 
-- `NODE_ENV` - Environment (development/production)
-- `PORT` - Server port (default: 5001)
-- `FRONTEND_URL` - Frontend URL for CORS
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Database config
-- `JWT_SECRET` - Secret for JWT tokens
+- `NODE_ENV` - Environment (`development`, `test`, or `production`)
+- `PORT` - Server port
+- `FRONTEND_URL` - Comma-separated allowed CORS origins
+- `DB_DIALECT`, `DB_LOG`, and dialect-specific database settings
+- `DB_DOCKER_PORT` (used by Docker compose host port mapping)
+- `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_NAME`
 
 ## Project Structure
 
@@ -157,7 +171,6 @@ backend/
 
 ## Notes
 
-- TypeScript compilation may show type warnings for Express handlers - these will be fixed incrementally
-- Native modules (bcrypt, sqlite3) may require build approval with pnpm
-- The server uses tsx for development (no build step needed)
+- Native modules (`bcrypt`, `sqlite3`) may require build approval with pnpm
+- The server uses `tsx` for development (no build step needed)
 - Production uses compiled JavaScript from the `dist/` directory

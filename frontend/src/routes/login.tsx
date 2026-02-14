@@ -41,6 +41,7 @@ function LoginPage() {
   const { refresh } = useUser();
   const navigate = useNavigate();
   const router = useRouter();
+  const search = Route.useSearch();
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginLoading, setLoginLoading] = useState(false);
   const toast = useToastContext();
@@ -57,8 +58,13 @@ function LoginPage() {
         const ok = await refresh();
         if (ok) {
           toast.success("Login successful! Welcome back.");
-          // Invalidate router and navigate to dashboard
+          // Invalidate router and respect the original auth redirect target.
           await router.invalidate();
+          const redirectTarget = search.redirect;
+          if (redirectTarget && redirectTarget.startsWith("/")) {
+            window.location.assign(redirectTarget);
+            return;
+          }
           navigate({ to: "/" });
         } else {
           toast.error(
@@ -86,7 +92,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-emerald-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto h-16 w-16 rounded-full bg-primary flex items-center justify-center">

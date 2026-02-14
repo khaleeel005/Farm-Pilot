@@ -1,7 +1,8 @@
 import customerService from "../services/customerService.js";
+import type { NextFunction, Request, Response } from "express";
 
 const customerController = {
-  create: async (req, res, next) => {
+  create: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customer = await customerService.createCustomer(req.body);
       res.status(201).json({ success: true, data: customer });
@@ -10,7 +11,7 @@ const customerController = {
     }
   },
 
-  getAll: async (req, res, next) => {
+  getAll: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customers = await customerService.getAllCustomers(req.query);
       res.status(200).json({ success: true, data: customers });
@@ -19,7 +20,7 @@ const customerController = {
     }
   },
 
-  getById: async (req, res, next) => {
+  getById: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customer = await customerService.getCustomerById(req.params.id);
       res.status(200).json({ success: true, data: customer });
@@ -28,7 +29,7 @@ const customerController = {
     }
   },
 
-  update: async (req, res, next) => {
+  update: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await customerService.updateCustomer(
         req.params.id,
@@ -40,7 +41,7 @@ const customerController = {
     }
   },
 
-  delete: async (req, res, next) => {
+  delete: async (req: Request, res: Response, next: NextFunction) => {
     try {
       await customerService.deleteCustomer(req.params.id);
       res

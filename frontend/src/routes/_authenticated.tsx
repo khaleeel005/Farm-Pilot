@@ -14,8 +14,6 @@ import { cn } from "@/lib/utils";
 import type { RouterContext } from "./__root";
 import {
   Egg,
-  Bell,
-  Search,
   Menu,
   X,
   LogOut,
@@ -27,6 +25,7 @@ import {
   TrendingUp,
   Calendar,
   Receipt,
+  CircleDollarSign,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 
@@ -39,7 +38,7 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({
         to: "/login",
         search: {
-          redirect: location.href,
+          redirect: `${location.pathname}${location.search}`,
         },
       });
     }
@@ -72,7 +71,7 @@ function AuthenticatedLayout() {
     {
       id: "sales",
       label: "Sales",
-      icon: () => <span className="text-sm font-bold">₦</span>,
+      icon: CircleDollarSign,
       path: "/sales",
     },
     { id: "feed", label: "Feed Management", icon: Package, path: "/feed" },
@@ -84,57 +83,18 @@ function AuthenticatedLayout() {
     { id: "reports", label: "Reports", icon: Calendar, path: "/reports" },
   ];
 
-  if (userRole === "staff") {
-    return (
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between px-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Egg className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <h1 className="text-xl font-bold text-balance">Farm Pilot</h1>
-              </div>
-              <Badge variant="secondary" className="hidden sm:inline-flex">
-                v2.0
-              </Badge>
-              <Badge variant="outline" className="hidden sm:inline-flex">
-                Staff
-              </Badge>
-            </div>
+  const staffNavItems = [
+    { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/" },
+    { id: "daily-entry", label: "Daily Entry", icon: Plus, path: "/daily-entry" },
+    { id: "sales", label: "Sales", icon: CircleDollarSign, path: "/sales" },
+    { id: "feed", label: "Feed Management", icon: Package, path: "/feed" },
+    { id: "houses", label: "House Management", icon: Egg, path: "/houses" },
+    { id: "labor", label: "Labor", icon: Users, path: "/labor" },
+    { id: "expenses", label: "Expenses", icon: Receipt, path: "/expenses" },
+    { id: "costs", label: "Cost Analysis", icon: TrendingUp, path: "/costs" },
+  ];
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                {user?.username}
-              </span>
-              <Button variant="ghost" size="icon">
-                <Search className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Bell className="h-4 w-4" />
-              </Button>
-              <ThemeToggle />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                title="Logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <div className="container mx-auto px-4 py-6">
-          <Outlet />
-        </div>
-      </div>
-    );
-  }
+  const navItems = userRole === "owner" ? ownerNavItems : staffNavItems;
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,6 +107,7 @@ function AuthenticatedLayout() {
               size="icon"
               className="lg:hidden"
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle navigation"
             >
               {sidebarOpen ? (
                 <X className="h-4 w-4" />
@@ -163,8 +124,11 @@ function AuthenticatedLayout() {
             <Badge variant="secondary" className="hidden sm:inline-flex">
               v2.0
             </Badge>
-            <Badge variant="default" className="hidden sm:inline-flex">
-              Owner
+            <Badge
+              variant={userRole === "owner" ? "default" : "outline"}
+              className="hidden sm:inline-flex capitalize"
+            >
+              {userRole}
             </Badge>
           </div>
 
@@ -172,18 +136,12 @@ function AuthenticatedLayout() {
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user?.username}
             </span>
-            <Button variant="ghost" size="icon">
-              <Search className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Bell className="h-4 w-4" />
-            </Button>
             <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
               onClick={handleLogout}
-              title="Logout"
+              aria-label="Logout"
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -201,8 +159,8 @@ function AuthenticatedLayout() {
         >
           <div className="flex h-full flex-col overflow-hidden">
             <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-              {ownerNavItems.map((item) => {
-                const Icon = item.icon as React.ElementType;
+              {navItems.map((item) => {
+                const Icon = item.icon;
                 const isActive = matchRoute({ to: item.path, fuzzy: false });
                 return (
                   <button
@@ -232,6 +190,7 @@ function AuthenticatedLayout() {
           <div
             className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
           />
         )}
 

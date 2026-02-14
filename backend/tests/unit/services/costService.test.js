@@ -1,7 +1,7 @@
-import { autoMigrate, sequelize } from "../../../src/utils/database.js";
-import DailyLog from "../../../src/models/DailyLog.js";
-import House from "../../../src/models/House.js";
-import costService from "../../../src/services/costService.js";
+import { autoMigrate, sequelize } from "../../../dist/utils/database.js";
+import DailyLog from "../../../dist/models/DailyLog.js";
+import House from "../../../dist/models/House.js";
+import costService from "../../../dist/services/costService.js";
 
 beforeAll(async () => {
   await autoMigrate();

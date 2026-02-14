@@ -1,8 +1,8 @@
 import request from "supertest";
 import app from "../../testApp.js";
 import jwt from "jsonwebtoken";
-import config from "../../src/config/auth.js";
-import { autoMigrate } from "../../src/utils/database.js";
+import config from "../../dist/config/auth.js";
+import { autoMigrate } from "../../dist/utils/database.js";
 
 describe("Reports RBAC", () => {
   const endpoint = "/api/reports/production?start=2025-08-01&end=2025-08-31";
@@ -43,7 +43,7 @@ describe("Reports RBAC", () => {
     expect(res.body.data).toHaveProperty("totalEggs");
   });
 
-  test("staff role allowed (200)", async () => {
+  test("staff role forbidden (403)", async () => {
     const token = jwt.sign(
       { id: 4, username: "staff", role: "staff" },
       config.JWT_SECRET,
@@ -53,9 +53,6 @@ describe("Reports RBAC", () => {
       .get(endpoint)
       .set("Authorization", `Bearer ${token}`);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.data).toHaveProperty("start");
-    expect(res.body.data).toHaveProperty("end");
-    expect(res.body.data).toHaveProperty("totalEggs");
+    expect(res.statusCode).toBe(403);
   });
 });

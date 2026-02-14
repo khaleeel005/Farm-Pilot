@@ -78,7 +78,7 @@ async function fetchWithAuth(
     if (v !== undefined && v !== null) headers.set(k, String(v));
   });
 
-  const merged: RequestInit = { ...(init || {}), headers };
+  const merged: RequestInit = { ...init, headers };
   const res = await fetch(input, merged);
 
   if (res.status === 401 && retry) {
@@ -89,7 +89,7 @@ async function fetchWithAuth(
       Object.entries(ah2).forEach(([k, v]) => {
         if (v !== undefined && v !== null) headers2.set(k, String(v));
       });
-      const retried: RequestInit = { ...(init || {}), headers: headers2 };
+      const retried: RequestInit = { ...init, headers: headers2 };
       return fetch(input, retried);
     }
   }

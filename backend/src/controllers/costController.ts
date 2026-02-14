@@ -1,9 +1,11 @@
 import costService from "../services/costService.js";
+import type { NextFunction, Request, Response } from "express";
+import { queryString } from "../utils/parsers.js";
 
 const costController = {
-  getDaily: async (req, res, next) => {
+  getDaily: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const date = req.params.date || req.query.date;
+      const date = req.params.date || queryString(req.query.date);
       const data = await costService.getDailyCosts(date);
       res.json({ success: true, data });
     } catch (err) {
@@ -11,9 +13,10 @@ const costController = {
     }
   },
 
-  getSummary: async (req, res, next) => {
+  getSummary: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { start, end } = req.query;
+      const start = queryString(req.query.start);
+      const end = queryString(req.query.end);
       const data = await costService.getSummary(start, end);
       res.json({ success: true, data });
     } catch (err) {
@@ -21,7 +24,7 @@ const costController = {
     }
   },
 
-  createOperating: async (req, res, next) => {
+  createOperating: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const oc = await costService.createOperatingCosts(req.body);
       res.status(201).json({ success: true, data: oc });
@@ -30,7 +33,7 @@ const costController = {
     }
   },
 
-  getEggPrice: async (req, res, next) => {
+  getEggPrice: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const date = req.params.date;
       const data = await costService.getEggPriceEstimate(date);
@@ -41,7 +44,11 @@ const costController = {
   },
 
   // Daily cost calculation as per Design 7.1
-  getDailyCalculation: async (req, res, next) => {
+  getDailyCalculation: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const date = req.params.date;
       const data = await costService.calculateDailyCost(date);
@@ -52,7 +59,11 @@ const costController = {
   },
 
   // Get average monthly production
-  getAverageMonthlyProduction: async (req, res, next) => {
+  getAverageMonthlyProduction: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const date = req.params.date;
       const production = await costService.getAverageMonthlyProduction(date);

@@ -1,12 +1,18 @@
-// SECURITY: JWT secret must be set via environment variable in production
-const JWT_SECRET = process.env.JWT_SECRET || "dev-only-secret-change-in-production";
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "dev-only-refresh-secret-change-in-production";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} must be set`);
+  }
+  return value;
+}
 
-// Warn if using default secrets in non-development environment
-if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
-  console.error("WARNING: JWT_SECRET environment variable not set in production!");
+const JWT_SECRET = requireEnv("JWT_SECRET");
+const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
+const JWT_EXPIRES_IN = requireEnv("JWT_EXPIRES_IN");
+const JWT_REFRESH_EXPIRES_IN = requireEnv("JWT_REFRESH_EXPIRES_IN");
+
+if (JWT_SECRET === JWT_REFRESH_SECRET) {
+  throw new Error("JWT_SECRET and JWT_REFRESH_SECRET must be different");
 }
 
 const config = {

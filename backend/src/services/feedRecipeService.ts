@@ -1,18 +1,21 @@
 import FeedRecipe from "../models/FeedRecipe.js";
 import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
+import type { FeedRecipeEntity } from "../types/entities.js";
+import type { FeedRecipeFiltersInput, FeedRecipeUpdateInput } from "../types/dto.js";
+import { asEntity } from "../utils/modelHelpers.js";
 
 const feedRecipeService = {
-  createFeedRecipe: async (data) => {
+  createFeedRecipe: async (data: Partial<FeedRecipeEntity>) => {
     if (!data.recipeName) {
       throw new BadRequestError("Recipe name is required");
     }
 
     // Validate percentages
     const totalPercent =
-      (data.cornPercent || 0) +
-      (data.soybeanPercent || 0) +
-      (data.wheatBranPercent || 0) +
-      (data.limestonePercent || 0);
+      (Number(data.cornPercent) || 0) +
+      (Number(data.soybeanPercent) || 0) +
+      (Number(data.wheatBranPercent) || 0) +
+      (Number(data.limestonePercent) || 0);
 
     if (totalPercent > 100) {
       throw new BadRequestError(
@@ -24,8 +27,8 @@ const feedRecipeService = {
     return recipe;
   },
 
-  getAllFeedRecipes: async (filters = {}) => {
-    const where = {};
+  getAllFeedRecipes: async (filters: FeedRecipeFiltersInput = {}) => {
+    const where: { isActive?: boolean } = {};
     if (filters.isActive !== undefined) {
       where.isActive = filters.isActive === "true";
     }
@@ -34,27 +37,36 @@ const feedRecipeService = {
     return recipes;
   },
 
-  getFeedRecipeById: async (id) => {
+  getFeedRecipeById: async (id: string | number | undefined) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Feed recipe id is required");
+    }
     const recipe = await FeedRecipe.findByPk(id);
     if (!recipe) throw new NotFoundError("Feed recipe not found");
     return recipe;
   },
 
-  updateFeedRecipe: async (id, updates) => {
+  updateFeedRecipe: async (
+    id: string | number | undefined,
+    updates: FeedRecipeUpdateInput,
+  ) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Feed recipe id is required");
+    }
     if (
       updates.cornPercent ||
       updates.soybeanPercent ||
       updates.wheatBranPercent ||
       updates.limestonePercent
     ) {
-      const existing = await FeedRecipe.findByPk(id);
+      const existing = asEntity<FeedRecipeEntity>(await FeedRecipe.findByPk(id));
       if (!existing) throw new NotFoundError("Feed recipe not found");
 
       const totalPercent =
-        (updates.cornPercent ?? existing.cornPercent) +
-        (updates.soybeanPercent ?? existing.soybeanPercent) +
-        (updates.wheatBranPercent ?? existing.wheatBranPercent) +
-        (updates.limestonePercent ?? existing.limestonePercent);
+        (Number(updates.cornPercent ?? existing.cornPercent) || 0) +
+        (Number(updates.soybeanPercent ?? existing.soybeanPercent) || 0) +
+        (Number(updates.wheatBranPercent ?? existing.wheatBranPercent) || 0) +
+        (Number(updates.limestonePercent ?? existing.limestonePercent) || 0);
 
       if (totalPercent > 100) {
         throw new BadRequestError(
@@ -69,7 +81,10 @@ const feedRecipeService = {
     return updated;
   },
 
-  deleteFeedRecipe: async (id) => {
+  deleteFeedRecipe: async (id: string | number | undefined) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Feed recipe id is required");
+    }
     const deleted = await FeedRecipe.destroy({ where: { id } });
     if (!deleted) throw new NotFoundError("Feed recipe not found");
     return true;

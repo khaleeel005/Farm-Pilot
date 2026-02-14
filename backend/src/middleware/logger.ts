@@ -1,14 +1,15 @@
 import morgan from "morgan";
+import type { Request } from "express";
 import logger from "../config/logger.js";
 
-morgan.token("body", (req) => {
+morgan.token("body", (req: Request) => {
   if (req.method === "POST" || req.method === "PUT") {
     try {
       const body = { ...req.body };
       if (body.password) body.password = "[HIDDEN]";
       if (body.refreshToken) body.refreshToken = "[HIDDEN]";
       return JSON.stringify(body);
-    } catch (e) {
+    } catch {
       return "<unserializable>";
     }
   }

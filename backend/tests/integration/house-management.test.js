@@ -1,5 +1,5 @@
 import request from "supertest";
-import { sequelize, autoMigrate } from "../../src/utils/database.js";
+import { sequelize, autoMigrate } from "../../dist/utils/database.js";
 import app from "../../testApp.js";
 import bcrypt from "bcrypt";
 
@@ -12,13 +12,13 @@ describe("House Management Flow", () => {
     await autoMigrate();
 
     // Create test users
-    const { default: User } = await import("../../src/models/User.js");
+    const { default: User } = await import("../../dist/models/User.js");
 
     const ownerHash = await bcrypt.hash("owner123", 10);
     await User.create({
       username: "testowner",
       password: ownerHash,
-      role: "Owner",
+      role: "owner",
       fullName: "Test Owner",
     });
 

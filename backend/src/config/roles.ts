@@ -3,6 +3,7 @@ export const ROLES = {
   OWNER: "owner",
   STAFF: "staff",
 };
+export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
   // Reports - owner only
@@ -103,12 +104,19 @@ export const PERMISSIONS = {
     UPDATE: [ROLES.OWNER],
     DELETE: [ROLES.OWNER],
   },
-};
+} as const;
+
+export type Resource = keyof typeof PERMISSIONS;
+type PermissionMap = Record<string, readonly string[]>;
 
 // Helper to check if a role has permission
-export const hasPermission = (role, resource, action) => {
-  const permission = PERMISSIONS[resource]?.[action];
-  return permission ? permission.includes(role) : false;
+export const hasPermission = (
+  role: string,
+  resource: Resource,
+  action: string,
+): boolean => {
+  const permission = (PERMISSIONS[resource] as PermissionMap)[action];
+  return Array.isArray(permission) ? permission.includes(role) : false;
 };
 
 export default {

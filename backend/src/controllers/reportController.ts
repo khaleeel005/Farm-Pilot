@@ -1,9 +1,12 @@
 import reportService from "../services/reportService.js";
+import type { NextFunction, Request, Response } from "express";
+import { queryString } from "../utils/parsers.js";
 
 const reportController = {
-  production: async (req, res, next) => {
+  production: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { start, end } = req.query;
+      const start = queryString(req.query.start);
+      const end = queryString(req.query.end);
       const data = await reportService.getProductionReport(start, end);
       res.json({ success: true, data });
     } catch (err) {
@@ -11,9 +14,10 @@ const reportController = {
     }
   },
 
-  sales: async (req, res, next) => {
+  sales: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { start, end } = req.query;
+      const start = queryString(req.query.start);
+      const end = queryString(req.query.end);
       const data = await reportService.getSalesReport(start, end);
       res.json({ success: true, data });
     } catch (err) {
@@ -21,9 +25,10 @@ const reportController = {
     }
   },
 
-  financial: async (req, res, next) => {
+  financial: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { start, end } = req.query;
+      const start = queryString(req.query.start);
+      const end = queryString(req.query.end);
       const data = await reportService.getFinancialReport(start, end);
       res.json({ success: true, data });
     } catch (err) {
@@ -31,16 +36,18 @@ const reportController = {
     }
   },
 
-  export: async (req, res, next) => {
+  export: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const type = req.params.type;
-      const { format } = req.query;
-      const { start, end } = req.query;
+      const format = queryString(req.query.format);
+      const start = queryString(req.query.start);
+      const end = queryString(req.query.end);
 
       if (!format || !["csv", "pdf"].includes(format)) {
-        return res
+        res
           .status(400)
           .json({ success: false, message: "format query must be csv or pdf" });
+        return;
       }
 
       if (format === "csv") {

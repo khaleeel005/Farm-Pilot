@@ -187,13 +187,13 @@ export function HouseManagement() {
   const getStatusColor = (status: House["status"]) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800";
+        return "border-transparent bg-success text-success-foreground";
       case "maintenance":
-        return "bg-yellow-100 text-yellow-800";
+        return "border-transparent bg-warning text-warning-foreground";
       case "inactive":
-        return "bg-red-100 text-red-800";
+        return "border-transparent bg-destructive text-destructive-foreground";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "text-foreground";
     }
   };
 

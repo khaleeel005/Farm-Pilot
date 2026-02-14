@@ -1,31 +1,86 @@
 import House from "../models/House.js";
+import logger from "../config/logger.js";
 import { BadRequestError } from "../utils/exceptions.js";
+import type { NextFunction, Request, Response } from "express";
+
+type HouseWritePayload = {
+  houseName?: string;
+  capacity?: number;
+  currentBirdCount?: number;
+  location?: string;
+  description?: string;
+  status?: "active" | "maintenance" | "inactive";
+};
+
+const parseOptionalInteger = (value: unknown): number | undefined => {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : undefined;
+};
+
+const parseOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const pickHousePayload = (body: Record<string, unknown>): HouseWritePayload => {
+  const payload: HouseWritePayload = {};
+  const houseName = parseOptionalString(body.houseName);
+  const nameAlias = parseOptionalString(body.name);
+  const capacity = parseOptionalInteger(body.capacity);
+  const currentBirdCount = parseOptionalInteger(body.currentBirdCount);
+  const currentBirdsAlias = parseOptionalInteger(body.currentBirds);
+  const location = parseOptionalString(body.location);
+  const description = parseOptionalString(body.description);
+  const notesAlias = parseOptionalString(body.notes);
+  const statusValue = body.status;
+
+  if (houseName || nameAlias) {
+    payload.houseName = houseName || nameAlias;
+  }
+  if (capacity !== undefined) {
+    payload.capacity = capacity;
+  }
+  if (currentBirdCount !== undefined || currentBirdsAlias !== undefined) {
+    payload.currentBirdCount =
+      currentBirdCount !== undefined ? currentBirdCount : currentBirdsAlias;
+  }
+  if (location) {
+    payload.location = location;
+  }
+  if (description || notesAlias) {
+    payload.description = description || notesAlias;
+  }
+  if (
+    statusValue === "active" ||
+    statusValue === "maintenance" ||
+    statusValue === "inactive"
+  ) {
+    payload.status = statusValue;
+  }
+
+  return payload;
+};
 
 const houseController = {
-  create: async (req, res, next) => {
+  create: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        name,
-        houseName,
-        capacity,
-        currentBirds,
-        currentBirdCount,
-        location,
-        description,
-        notes,
-        status,
-      } = req.body;
+      const payload = pickHousePayload(req.body as Record<string, unknown>);
 
-      const finalHouseName = name || houseName;
-      if (!finalHouseName) throw new BadRequestError("House name is required");
+      if (!payload.houseName) {
+        throw new BadRequestError("House name is required");
+      }
 
       const house = await House.create({
-        houseName: finalHouseName,
-        capacity: capacity || 1000,
-        currentBirdCount: currentBirds || currentBirdCount || 0,
-        location,
-        description: notes || description,
-        status: status || "active",
+        ...payload,
+        capacity: payload.capacity ?? 1000,
+        currentBirdCount: payload.currentBirdCount ?? 0,
+        status: payload.status ?? "active",
       });
 
       res.status(201).json({ success: true, data: house });
@@ -34,7 +89,7 @@ const houseController = {
     }
   },
 
-  getAll: async (req, res, next) => {
+  getAll: async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const houses = await House.findAll();
       res.status(200).json({ success: true, data: houses });
@@ -43,15 +98,14 @@ const houseController = {
     }
   },
 
-  getById: async (req, res, next) => {
+  getById: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       const house = await House.findByPk(id);
 
       if (!house) {
-        return res
-          .status(404)
-          .json({ success: false, message: "House not found" });
+        res.status(404).json({ success: false, message: "House not found" });
+        return;
       }
 
       res.status(200).json({ success: true, data: house });
@@ -60,17 +114,19 @@ const houseController = {
     }
   },
 
-  update: async (req, res, next) => {
+  update: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      const updates = pickHousePayload(req.body as Record<string, unknown>);
+      if (Object.keys(updates).length === 0) {
+        throw new BadRequestError("No valid house fields provided for update");
+      }
 
       const [updatedCount] = await House.update(updates, { where: { id } });
 
       if (updatedCount === 0) {
-        return res
-          .status(404)
-          .json({ success: false, message: "House not found" });
+        res.status(404).json({ success: false, message: "House not found" });
+        return;
       }
 
       const updatedHouse = await House.findByPk(id);
@@ -80,19 +136,18 @@ const houseController = {
     }
   },
 
-  delete: async (req, res, next) => {
+  delete: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       const deletedCount = await House.destroy({ where: { id } });
 
       if (deletedCount === 0) {
-        return res
-          .status(404)
-          .json({ success: false, message: "House not found" });
+        res.status(404).json({ success: false, message: "House not found" });
+        return;
       }
 
-      console.log(`[${new Date().toISOString()}] Deleted house id=${id}`);
-      res.status(204).json({ success: true });
+      logger.info(`Deleted house id=${id}`);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

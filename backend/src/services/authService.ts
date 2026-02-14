@@ -1,12 +1,27 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import type { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import User from "../models/User.js";
 import config from "../config/auth.js";
 import { UnauthorizedError, BadRequestError } from "../utils/exceptions.js";
+import type { UserEntity } from "../types/entities.js";
+import { asEntity } from "../utils/modelHelpers.js";
+
+type JwtTokenPayload = JwtPayload & {
+  id: number;
+  role: string;
+};
+
+const jwtSecret: Secret = config.JWT_SECRET;
+const jwtRefreshSecret: Secret = config.JWT_REFRESH_SECRET;
+const accessTokenExpiresIn = config.JWT_EXPIRES_IN as SignOptions["expiresIn"];
+const refreshTokenExpiresIn = config.JWT_REFRESH_EXPIRES_IN as SignOptions["expiresIn"];
 
 const authService = {
-  login: async (username, password) => {
-    const user = await User.findOne({ where: { username } });
+  login: async (username: string, password: string) => {
+    const user = asEntity<UserEntity>(
+      await User.findOne({ where: { username } }),
+    );
 
     if (!user) {
       throw new UnauthorizedError("Invalid username or password");
@@ -19,17 +34,17 @@ const authService = {
 
     const accessToken = jwt.sign(
       { id: user.id, role: String(user.role).toLowerCase() },
-      config.JWT_SECRET,
+      jwtSecret,
       {
-        expiresIn: config.JWT_EXPIRES_IN,
+        expiresIn: accessTokenExpiresIn,
       }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id, role: String(user.role).toLowerCase() },
-      config.JWT_SECRET,
+      jwtRefreshSecret,
       {
-        expiresIn: "7d", // Refresh token valid for 7 days
+        expiresIn: refreshTokenExpiresIn,
       }
     );
 
@@ -45,8 +60,8 @@ const authService = {
     return { user: userData, accessToken, refreshToken };
   },
 
-  getCurrentUser: async (userId) => {
-    const user = await User.findByPk(userId);
+  getCurrentUser: async (userId: number) => {
+    const user = asEntity<UserEntity>(await User.findByPk(userId));
 
     if (!user) {
       throw new UnauthorizedError("User not found");
@@ -61,23 +76,28 @@ const authService = {
     };
   },
 
-  refreshToken: async (refreshToken) => {
+  refreshToken: async (refreshToken: string) => {
     if (!refreshToken) {
       throw new BadRequestError("Refresh token is required");
     }
 
     try {
-      const payload = jwt.verify(refreshToken, config.JWT_SECRET);
+      const payload = jwt.verify(refreshToken, jwtRefreshSecret);
+      if (typeof payload === "string" || payload.id === undefined || payload.role === undefined) {
+        throw new UnauthorizedError("Invalid refresh token payload");
+      }
+
+      const parsedPayload = payload as JwtTokenPayload;
       const newToken = jwt.sign(
-        { id: payload.id, role: String(payload.role).toLowerCase() },
-        config.JWT_SECRET,
+        { id: parsedPayload.id, role: String(parsedPayload.role).toLowerCase() },
+        jwtSecret,
         {
-          expiresIn: config.JWT_EXPIRES_IN,
+          expiresIn: accessTokenExpiresIn,
         }
       );
 
       return newToken;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedError("Invalid refresh token");
     }
   },

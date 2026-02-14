@@ -1,4 +1,4 @@
-import feedCostCalculator from "../../../src/services/feedCostCalculator.js";
+import feedCostCalculator from "../../../dist/services/feedCostCalculator.js";
 
 describe("feedCostCalculator", () => {
   test("calculates cost correctly for a simple recipe", () => {

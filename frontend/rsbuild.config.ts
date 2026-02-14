@@ -3,6 +3,12 @@ import { pluginReact } from "@rsbuild/plugin-react";
 import { TanStackRouterRspack } from "@tanstack/router-plugin/rspack";
 import path from "path";
 
+const apiUrl = process.env.API_URL;
+
+if (!apiUrl) {
+  throw new Error("API_URL must be set");
+}
+
 export default defineConfig({
   plugins: [pluginReact()],
 
@@ -17,7 +23,7 @@ export default defineConfig({
     // Proxy API requests to backend
     proxy: {
       "/api": {
-        target: "http://localhost:5001",
+        target: apiUrl,
         changeOrigin: true,
       },
     },
@@ -40,9 +46,7 @@ export default defineConfig({
       index: "./src/main.tsx",
     },
     define: {
-      "process.env.API_URL": JSON.stringify(
-        process.env.API_URL || "http://localhost:5001",
-      ),
+      "process.env.API_URL": JSON.stringify(apiUrl),
     },
   },
 

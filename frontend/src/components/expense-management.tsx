@@ -44,6 +44,7 @@ import {
 import { getCostTypes, getCostEntries, createCostEntry } from "@/lib/api";
 import formatCurrency from "@/lib/format";
 import type { CostEntry, CostTypeOption } from "@/types/entities/cost";
+import { useToastContext } from "@/hooks";
 
 interface ExpenseManagementProps {
   userRole?: "owner" | "staff";
@@ -63,6 +64,7 @@ export function ExpenseManagement({
     amount: 0,
     category: "operational",
   });
+  const toast = useToastContext();
 
   // Calculate current month date range
   const currentMonthRange = useMemo(() => {
@@ -87,6 +89,7 @@ export function ExpenseManagement({
         // success response contains created cost entry
         setIsAddExpenseOpen(false);
         await loadCostData();
+        toast.success("Cost entry added successfully.");
         setNewCostEntry({
           date: new Date().toISOString().split("T")[0],
           costType: undefined,
@@ -95,11 +98,11 @@ export function ExpenseManagement({
           category: "operational",
         });
       } else {
-        alert("Failed to add cost entry");
+        toast.error("Failed to add cost entry.");
       }
     } catch (error) {
       console.error("Failed to create cost entry:", error);
-      alert("Failed to add cost entry");
+      toast.error("Failed to add cost entry.");
     } finally {
       setLoading(false);
     }
@@ -152,10 +155,11 @@ export function ExpenseManagement({
       console.error("Failed to load cost data:", error);
       setCostEntries([]);
       setCostTypes([]);
+      toast.error("Failed to load cost data.");
     } finally {
       setLoading(false);
     }
-  }, [currentMonthRange.startDate, currentMonthRange.endDate]);
+  }, [currentMonthRange.startDate, currentMonthRange.endDate, toast]);
 
   useEffect(() => {
     loadCostData();
@@ -176,7 +180,7 @@ export function ExpenseManagement({
     switch (status) {
       case "approved":
         return (
-          <Badge className="bg-green-100 text-green-800">
+          <Badge className="border-transparent bg-success text-success-foreground">
             <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>

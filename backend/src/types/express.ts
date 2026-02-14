@@ -1,25 +1,33 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from "express";
 
-// Express handler types
-export type AsyncRequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => Promise<void>;
-
-export type RequestHandler = (req: Request, res: Response, next: NextFunction) => void;
-
-// Auth request with user
-export interface AuthRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
+export interface AuthenticatedUser {
+  id: number;
+  role: string;
+  username?: string;
 }
 
-export type AuthRequestHandler = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => Promise<void>;
+export type ApiRequest<
+  Params extends Record<string, string> = Record<string, string>,
+  ResBody = unknown,
+  ReqBody = Record<string, unknown>,
+  ReqQuery extends Record<string, string | string[] | undefined> = Record<
+    string,
+    string | string[] | undefined
+  >,
+> = Request<Params, ResBody, ReqBody, ReqQuery>;
+
+export type ApiResponse<ResBody = unknown> = Response<ResBody>;
+
+export type ApiHandler<
+  Params extends Record<string, string> = Record<string, string>,
+  ResBody = unknown,
+  ReqBody = Record<string, unknown>,
+  ReqQuery extends Record<string, string | string[] | undefined> = Record<
+    string,
+    string | string[] | undefined
+  >,
+> = (
+  req: ApiRequest<Params, ResBody, ReqBody, ReqQuery>,
+  res: ApiResponse<ResBody>,
+  next: NextFunction,
+) => Promise<unknown> | unknown;

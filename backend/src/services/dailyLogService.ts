@@ -1,65 +1,136 @@
 import DailyLog from "../models/DailyLog.js";
 import House from "../models/House.js";
 import FeedBatch from "../models/FeedBatch.js";
+import logger from "../config/logger.js";
 import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
 import feedBatchStatsService from "./feedBatchStatsService.js";
+import type {
+  DailyLogEntity,
+  FeedBatchEntity,
+  HouseEntity,
+} from "../types/entities.js";
+import type { DailyLogFiltersInput } from "../types/dto.js";
+
+type DailyLogRecord = DailyLogEntity & {
+  House?: HouseEntity;
+  FeedBatch?: FeedBatchEntity | null;
+};
+
+type DailyLogInput = Partial<DailyLogEntity> & {
+  logDate?: string;
+  houseId?: number;
+};
+
+const DAILY_LOG_MUTABLE_FIELDS = [
+  "logDate",
+  "houseId",
+  "eggsCollected",
+  "crackedEggs",
+  "feedBatchId",
+  "feedBagsUsed",
+  "mortalityCount",
+  "notes",
+  "supervisorId",
+] as const;
+
+type DailyLogMutableField = (typeof DAILY_LOG_MUTABLE_FIELDS)[number];
+type DailyLogWritePayload = Partial<Pick<DailyLogEntity, DailyLogMutableField>>;
+
+const asDailyLog = (value: unknown): DailyLogRecord | null =>
+  value as DailyLogRecord | null;
+
+const pickDailyLogPayload = (data: DailyLogInput): DailyLogWritePayload => {
+  const payload: DailyLogWritePayload = {};
+  const mutablePayload = payload as Record<DailyLogMutableField, unknown>;
+
+  for (const field of DAILY_LOG_MUTABLE_FIELDS) {
+    const value = data[field];
+    if (value !== undefined) {
+      mutablePayload[field] = value;
+    }
+  }
+
+  return payload;
+};
 
 const dailyLogService = {
   // Validate feed batch usage before creating/updating daily log
-  validateFeedBatchUsage: async (data, existingLogId = null) => {
-    if (data.feedBatchId && data.feedBagsUsed) {
-      const batchStats = await feedBatchStatsService.getBatchUsageStats(
-        data.feedBatchId
+  validateFeedBatchUsage: async (
+    data: DailyLogInput,
+    existingLogId: string | number | null = null,
+  ) => {
+    let existingLog: DailyLogRecord | null = null;
+    if (existingLogId) {
+      const existingLogIdNum =
+        typeof existingLogId === "string"
+          ? Number.parseInt(existingLogId, 10)
+          : existingLogId;
+      existingLog = asDailyLog(await DailyLog.findByPk(existingLogIdNum));
+    }
+
+    const feedBatchId = data.feedBatchId ?? existingLog?.feedBatchId;
+    const feedBagsUsed = data.feedBagsUsed ?? existingLog?.feedBagsUsed;
+    const hasIncomingFeedBagsUsed =
+      data.feedBagsUsed !== null && data.feedBagsUsed !== undefined;
+
+    if (hasIncomingFeedBagsUsed && !feedBatchId) {
+      throw new BadRequestError(
+        "feedBatchId is required when feedBagsUsed is provided",
       );
+    }
 
-      // If this is an update, subtract the existing usage first
-      let currentAvailable = batchStats.remainingBags;
-      if (existingLogId) {
-        const existingLog = await DailyLog.findByPk(existingLogId);
-        if (existingLog && existingLog.feedBagsUsed) {
-          currentAvailable += existingLog.feedBagsUsed;
-        }
-      }
+    if (!feedBatchId || feedBagsUsed === null || feedBagsUsed === undefined) {
+      return;
+    }
 
-      if (data.feedBagsUsed > currentAvailable) {
-        throw new BadRequestError(
-          `Cannot use ${data.feedBagsUsed} bags. Only ${currentAvailable} bags available in batch "${batchStats.batchName}".`
-        );
-      }
+    const batchStats = await feedBatchStatsService.getBatchUsageStats(
+      Number(feedBatchId),
+    );
 
-      if (batchStats.isEmpty && currentAvailable <= 0) {
-        throw new BadRequestError(
-          `Feed batch "${batchStats.batchName}" is empty and cannot be used.`
-        );
-      }
+    // If this is an update, subtract the existing usage first
+    let currentAvailable = batchStats.remainingBags;
+    if (existingLog?.feedBagsUsed) {
+      currentAvailable += Number(existingLog.feedBagsUsed);
+    }
+
+    if (Number(feedBagsUsed) > currentAvailable) {
+      throw new BadRequestError(
+        `Cannot use ${feedBagsUsed} bags. Only ${currentAvailable} bags available in batch "${batchStats.batchName}".`,
+      );
+    }
+
+    if (batchStats.isEmpty && currentAvailable <= 0) {
+      throw new BadRequestError(
+        `Feed batch "${batchStats.batchName}" is empty and cannot be used.`,
+      );
     }
   },
 
-  createDailyLog: async (data) => {
-    if (!data.logDate || !data.houseId) {
+  createDailyLog: async (data: DailyLogInput) => {
+    const payload = pickDailyLogPayload(data);
+
+    if (!payload.logDate || !payload.houseId) {
       throw new BadRequestError("logDate and houseId are required");
     }
 
     // Check if a log already exists for this date and house
-    const existingLog = await DailyLog.findOne({
+    const existingLog = asDailyLog(await DailyLog.findOne({
       where: {
-        logDate: data.logDate,
-        houseId: data.houseId,
+        logDate: payload.logDate,
+        houseId: payload.houseId,
       },
-    });
+    }));
 
     if (existingLog) {
       // Validate feed batch usage for update
-      await dailyLogService.validateFeedBatchUsage(data, existingLog.id);
+      await dailyLogService.validateFeedBatchUsage(payload, existingLog.id);
 
       // Update the existing log instead of creating a new one
-      console.log(
-        `[${new Date().toISOString()}] Updating existing daily log id=${
-          existingLog.id
-        } for house=${data.houseId} date=${data.logDate}`
+      logger.info(
+        `Updating existing daily log id=${existingLog.id} for house=${payload.houseId} date=${payload.logDate}`,
       );
 
-      const [updatedCount] = await DailyLog.update(data, {
+      const [updatedCount] = await DailyLog.update(payload, {
         where: { id: existingLog.id },
       });
 
@@ -98,9 +169,12 @@ const dailyLogService = {
       }
     } else {
       // Validate feed batch usage for new creation
-      await dailyLogService.validateFeedBatchUsage(data);
+      await dailyLogService.validateFeedBatchUsage(payload);
 
-      const created = await DailyLog.create(data);
+      const created = asDailyLog(await DailyLog.create(payload));
+      if (!created) {
+        throw new BadRequestError("Failed to create daily log");
+      }
       // Fetch the created log with House information
       const createdWithHouse = await DailyLog.findByPk(created.id, {
         include: [
@@ -134,8 +208,11 @@ const dailyLogService = {
     }
   },
 
-  getAllDailyLogs: async (filters = {}) => {
-    const where = {};
+  getAllDailyLogs: async (filters: DailyLogFiltersInput = {}) => {
+    const where: {
+      logDate?: string;
+      houseId?: number;
+    } = {};
     const date = filters.date || filters.logDate;
     if (date) {
       where.logDate = date;
@@ -179,7 +256,10 @@ const dailyLogService = {
     return logs;
   },
 
-  getDailyLogById: async (id) => {
+  getDailyLogById: async (id: string | number | undefined) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Daily log id is required");
+    }
     const log = await DailyLog.findByPk(id, {
       include: [
         {
@@ -212,11 +292,21 @@ const dailyLogService = {
     return log;
   },
 
-  updateDailyLog: async (id, updates) => {
+  updateDailyLog: async (
+    id: string | number | undefined,
+    updates: DailyLogInput,
+  ) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Daily log id is required");
+    }
+    const payload = pickDailyLogPayload(updates);
+    if (Object.keys(payload).length === 0) {
+      throw new BadRequestError("No valid fields provided for update");
+    }
     // Validate feed batch usage before updating
-    await dailyLogService.validateFeedBatchUsage(updates, id);
+    await dailyLogService.validateFeedBatchUsage(payload, id);
 
-    const [updatedCount] = await DailyLog.update(updates, { where: { id } });
+    const [updatedCount] = await DailyLog.update(payload, { where: { id } });
     if (!updatedCount) throw new NotFoundError("Daily log not found");
     const updated = await DailyLog.findByPk(id, {
       include: [
@@ -249,7 +339,10 @@ const dailyLogService = {
     return updated;
   },
 
-  deleteDailyLog: async (id) => {
+  deleteDailyLog: async (id: string | number | undefined) => {
+    if (id === undefined || id === null || id === "") {
+      throw new BadRequestError("Daily log id is required");
+    }
     const deleted = await DailyLog.destroy({ where: { id } });
     if (!deleted) throw new NotFoundError("Daily log not found");
     return true;

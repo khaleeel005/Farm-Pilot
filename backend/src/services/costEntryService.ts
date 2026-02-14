@@ -1,294 +1,361 @@
+import {
+  ForeignKeyConstraintError,
+  Op,
+  ValidationError,
+  type Model,
+} from "sequelize";
 import CostEntry, { CostTypes } from "../models/CostEntry.js";
 import House from "../models/House.js";
 import User from "../models/User.js";
-import { Op } from "sequelize";
-import { BadRequestError, NotFoundError } from "../utils/exceptions.js";
+import {
+  BadRequestError,
+  CustomError,
+  InternalServerError,
+  NotFoundError,
+} from "../utils/exceptions.js";
+import type {
+  CostEntryFiltersInput,
+  CostEntryPaginationInput,
+  CostSummaryFiltersInput,
+} from "../types/dto.js";
+import type { CostEntryEntity, HouseEntity, UserEntity } from "../types/entities.js";
+
+type CostEntryWithRelations = CostEntryEntity & {
+  house?: (HouseEntity & { name?: string }) | null;
+  creator?: Pick<UserEntity, "id" | "username"> | null;
+};
+
+type CostDateWhere = {
+  [Op.gte]?: string;
+  [Op.lte]?: string;
+};
+
+type CostAmountWhere = {
+  [Op.gte]?: number;
+  [Op.lte]?: number;
+};
+
+type CostEntryWhereClause = {
+  date?: CostDateWhere;
+  costType?: CostEntryEntity["costType"];
+  category?: CostEntryEntity["category"];
+  houseId?: number;
+  createdBy?: number;
+  amount?: CostAmountWhere;
+};
+
+type CostEntrySummaryModel = Model & {
+  getDataValue: (key: "totalAmount" | "totalEntries" | "averageAmount") =>
+    | string
+    | number
+    | null;
+};
+
+const COST_ENTRY_MUTABLE_FIELDS = [
+  "date",
+  "costType",
+  "description",
+  "amount",
+  "category",
+  "paymentMethod",
+  "vendor",
+  "receiptNumber",
+  "notes",
+  "houseId",
+] as const;
+
+type CostEntryMutableField = (typeof COST_ENTRY_MUTABLE_FIELDS)[number];
+type CostEntryWritePayload = Partial<Pick<CostEntryEntity, CostEntryMutableField>>;
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeCostEntryHouse(entry: CostEntryWithRelations): CostEntryWithRelations {
+  if (entry.house?.houseName && !entry.house.name) {
+    return {
+      ...entry,
+      house: {
+        ...entry.house,
+        name: entry.house.houseName,
+      },
+    };
+  }
+  return entry;
+}
+
+function toCostEntryWithRelations(model: Model): CostEntryWithRelations {
+  return model.toJSON() as CostEntryWithRelations;
+}
+
+function pickCostEntryPayload(input: Partial<CostEntryEntity>): CostEntryWritePayload {
+  const payload: CostEntryWritePayload = {};
+  const mutablePayload = payload as Record<CostEntryMutableField, unknown>;
+
+  for (const field of COST_ENTRY_MUTABLE_FIELDS) {
+    const value = input[field];
+    if (value !== undefined) {
+      mutablePayload[field] = value;
+    }
+  }
+
+  return payload;
+}
+
+function mapAndThrowCostEntryError(error: unknown, contextMessage: string): never {
+  if (error instanceof CustomError) {
+    throw error;
+  }
+
+  if (error instanceof ValidationError || error instanceof ForeignKeyConstraintError) {
+    throw new BadRequestError(error.message);
+  }
+
+  if (error instanceof Error) {
+    throw new InternalServerError(`${contextMessage}: ${error.message}`);
+  }
+
+  throw new InternalServerError(contextMessage);
+}
 
 class CostEntryService {
-  // Create a new cost entry
-  async createCostEntry(costData, userId) {
+  async createCostEntry(costData: Partial<CostEntryEntity>, userId?: number) {
+    const payload = pickCostEntryPayload(costData);
+
     try {
-      const costEntry = await CostEntry.create({
-        ...costData,
+      const created = await CostEntry.create({
+        ...payload,
         createdBy: userId,
       });
 
-      return await this.getCostEntryById(costEntry.id);
-    } catch (error) {
-      throw new Error(`Error creating cost entry: ${error.message}`);
+      const createdId = Number(created.getDataValue("id"));
+      return await this.getCostEntryById(createdId);
+    } catch (error: unknown) {
+      mapAndThrowCostEntryError(error, "Failed to create cost entry");
     }
   }
 
-  // Get cost entry by ID with associations
-  async getCostEntryById(id) {
-    try {
-      const costEntry = await CostEntry.findByPk(id, {
-        include: [
-          {
-            model: House,
-            as: "house",
-            attributes: ["id", "houseName", "location"],
-          },
-          {
-            model: User,
-            as: "creator",
-            attributes: ["id", "username"],
-          },
-        ],
-      });
-
-      if (!costEntry) {
-        throw new Error("Cost entry not found");
-      }
-
-      // Backwards compatibility: some callers expect house.name
-      if (
-        costEntry.house &&
-        costEntry.house.houseName &&
-        !costEntry.house.name
-      ) {
-        costEntry.house.name = costEntry.house.houseName;
-      }
-
-      return costEntry;
-    } catch (error) {
-      throw new Error(`Error fetching cost entry: ${error.message}`);
-    }
-  }
-
-  // Get cost entries with filtering and pagination
-  async getCostEntries(filters = {}, pagination = {}) {
-    try {
-      const {
-        startDate,
-        endDate,
-        costType,
-        category,
-        houseId,
-        createdBy,
-        minAmount,
-        maxAmount,
-      } = filters;
-
-      const { page = 1, limit = 50 } = pagination;
-      const offset = (page - 1) * limit;
-
-      const whereClause = {};
-
-      if (startDate || endDate) {
-        whereClause.date = {};
-        if (startDate) whereClause.date[Op.gte] = startDate;
-        if (endDate) whereClause.date[Op.lte] = endDate;
-      }
-
-      if (costType) whereClause.costType = costType;
-      if (category) whereClause.category = category;
-      if (houseId) whereClause.houseId = houseId;
-      if (createdBy) whereClause.createdBy = createdBy;
-
-      if (minAmount !== undefined || maxAmount !== undefined) {
-        whereClause.amount = {};
-        if (minAmount !== undefined) whereClause.amount[Op.gte] = minAmount;
-        if (maxAmount !== undefined) whereClause.amount[Op.lte] = maxAmount;
-      }
-
-      const { rows: costEntries, count: total } =
-        await CostEntry.findAndCountAll({
-          where: whereClause,
-          include: [
-            {
-              model: House,
-              as: "house",
-              attributes: ["id", "houseName", "location"],
-            },
-            {
-              model: User,
-              as: "creator",
-              attributes: ["id", "username"],
-            },
-          ],
-          order: [
-            ["date", "DESC"],
-            ["createdAt", "DESC"],
-          ],
-          limit,
-          offset,
-        });
-
-      // Map included house.houseName to house.name for backward compatibility
-      const mapped = costEntries.map((ce) => {
-        if (ce.house && ce.house.houseName && !ce.house.name) {
-          ce.house.name = ce.house.houseName;
-        }
-        return ce;
-      });
-
-      return {
-        costEntries: mapped,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+  async getCostEntryById(id: number) {
+    const costEntryModel = await CostEntry.findByPk(id, {
+      include: [
+        {
+          model: House,
+          as: "house",
+          attributes: ["id", "houseName", "location"],
         },
-      };
-    } catch (error) {
-      throw new Error(`Error fetching cost entries: ${error.message}`);
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "username"],
+        },
+      ],
+    });
+
+    if (!costEntryModel) {
+      throw new NotFoundError("Cost entry not found");
     }
+
+    return normalizeCostEntryHouse(toCostEntryWithRelations(costEntryModel));
   }
 
-  // Update cost entry
-  async updateCostEntry(id, updateData, userId) {
+  async getCostEntries(
+    filters: CostEntryFiltersInput = {},
+    pagination: CostEntryPaginationInput = {},
+  ) {
+    const {
+      startDate,
+      endDate,
+      costType,
+      category,
+      houseId,
+      createdBy,
+      minAmount,
+      maxAmount,
+    } = filters;
+
+    const { page = 1, limit = 50 } = pagination;
+    const offset = (page - 1) * limit;
+
+    const whereClause: CostEntryWhereClause = {};
+
+    if (startDate || endDate) {
+      whereClause.date = {};
+      if (startDate) whereClause.date[Op.gte] = startDate;
+      if (endDate) whereClause.date[Op.lte] = endDate;
+    }
+
+    if (costType) whereClause.costType = costType;
+    if (category) whereClause.category = category;
+    if (houseId) whereClause.houseId = houseId;
+    if (createdBy) whereClause.createdBy = createdBy;
+
+    if (minAmount !== undefined || maxAmount !== undefined) {
+      whereClause.amount = {};
+      if (minAmount !== undefined) whereClause.amount[Op.gte] = minAmount;
+      if (maxAmount !== undefined) whereClause.amount[Op.lte] = maxAmount;
+    }
+
+    const { rows, count: total } = await CostEntry.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: House,
+          as: "house",
+          attributes: ["id", "houseName", "location"],
+        },
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "username"],
+        },
+      ],
+      order: [
+        ["date", "DESC"],
+        ["createdAt", "DESC"],
+      ],
+      limit,
+      offset,
+    });
+
+    const costEntries = rows.map((row) =>
+      normalizeCostEntryHouse(toCostEntryWithRelations(row)),
+    );
+
+    return {
+      costEntries,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async updateCostEntry(
+    id: number,
+    updateData: Partial<CostEntryEntity>,
+    _userId?: number,
+  ) {
+    const payload = pickCostEntryPayload(updateData);
+
+    if (Object.keys(payload).length === 0) {
+      throw new BadRequestError("No valid fields provided for update");
+    }
+
+    const costEntry = await CostEntry.findByPk(id);
+
+    if (!costEntry) {
+      throw new NotFoundError("Cost entry not found");
+    }
+
     try {
-      const costEntry = await CostEntry.findByPk(id);
-
-      if (!costEntry) {
-        throw new Error("Cost entry not found");
-      }
-
-      await costEntry.update(updateData);
+      await costEntry.update(payload);
       return await this.getCostEntryById(id);
-    } catch (error) {
-      throw new Error(`Error updating cost entry: ${error.message}`);
+    } catch (error: unknown) {
+      mapAndThrowCostEntryError(error, "Failed to update cost entry");
     }
   }
 
-  async deleteCostEntry(id) {
-    try {
-      const costEntry = await CostEntry.findByPk(id);
+  async deleteCostEntry(id: number) {
+    const costEntry = await CostEntry.findByPk(id);
 
-      if (!costEntry) {
-        throw new NotFoundError("Cost entry not found");
-      }
-
-      await costEntry.destroy();
-      return { message: "Cost entry deleted successfully" };
-    } catch (error) {
-      throw new BadRequestError(`Error deleting cost entry: ${error.message}`);
+    if (!costEntry) {
+      throw new NotFoundError("Cost entry not found");
     }
+
+    await costEntry.destroy();
+    return { message: "Cost entry deleted successfully" };
   }
 
-  async getCostSummary(filters = {}) {
-    try {
-      const {
-        startDate,
-        endDate,
-        groupBy = "month", // 'day', 'week', 'month', 'year'
-        houseId,
-      } = filters;
+  async getCostSummary(filters: CostSummaryFiltersInput = {}) {
+    const {
+      startDate,
+      endDate,
+      groupBy: _groupBy = "month",
+      houseId,
+    } = filters;
 
-      const whereClause = {};
+    const whereClause: CostEntryWhereClause = {};
 
-      if (startDate || endDate) {
-        whereClause.date = {};
-        if (startDate) whereClause.date[Op.gte] = startDate;
-        if (endDate) whereClause.date[Op.lte] = endDate;
-      }
-
-      if (houseId) whereClause.houseId = houseId;
-
-      const costTypeField =
-        (CostEntry.rawAttributes.costType &&
-          CostEntry.rawAttributes.costType.field) ||
-        "cost_type";
-      const amountField =
-        (CostEntry.rawAttributes.amount &&
-          CostEntry.rawAttributes.amount.field) ||
-        "amount";
-
-      const costsByType = await CostEntry.findAll({
-        where: whereClause,
-        attributes: [
-          [CostEntry.sequelize.col(costTypeField), "costType"],
-          [
-            CostEntry.sequelize.fn("SUM", CostEntry.sequelize.col(amountField)),
-            "totalAmount",
-          ],
-          [
-            CostEntry.sequelize.fn("COUNT", CostEntry.sequelize.col("id")),
-            "entryCount",
-          ],
-        ],
-        group: [CostEntry.sequelize.col(costTypeField)],
-        order: [
-          [
-            CostEntry.sequelize.fn("SUM", CostEntry.sequelize.col(amountField)),
-            "DESC",
-          ],
-        ],
-      });
-
-      const categoryField =
-        (CostEntry.rawAttributes.category &&
-          CostEntry.rawAttributes.category.field) ||
-        "category";
-
-      const costsByCategory = await CostEntry.findAll({
-        where: whereClause,
-        attributes: [
-          [CostEntry.sequelize.col(categoryField), "category"],
-          [
-            CostEntry.sequelize.fn("SUM", CostEntry.sequelize.col(amountField)),
-            "totalAmount",
-          ],
-          [
-            CostEntry.sequelize.fn("COUNT", CostEntry.sequelize.col("id")),
-            "entryCount",
-          ],
-        ],
-        group: [CostEntry.sequelize.col(categoryField)],
-        order: [
-          [
-            CostEntry.sequelize.fn("SUM", CostEntry.sequelize.col(amountField)),
-            "DESC",
-          ],
-        ],
-      });
-
-      const totalSummary = await CostEntry.findOne({
-        where: whereClause,
-        attributes: [
-          [
-            CostEntry.sequelize.fn("SUM", CostEntry.sequelize.col("amount")),
-            "totalAmount",
-          ],
-          [
-            CostEntry.sequelize.fn("COUNT", CostEntry.sequelize.col("id")),
-            "totalEntries",
-          ],
-          [
-            CostEntry.sequelize.fn("AVG", CostEntry.sequelize.col("amount")),
-            "averageAmount",
-          ],
-        ],
-      });
-
-      return {
-        costsByType: costsByType.map((item) => ({
-          costType: item.getDataValue("costType") || null,
-          totalAmount: parseFloat(item.getDataValue("totalAmount") || 0),
-          entryCount: parseInt(item.getDataValue("entryCount") || 0),
-        })),
-        costsByCategory: costsByCategory.map((item) => ({
-          category: item.getDataValue("category") || null,
-          totalAmount: parseFloat(item.getDataValue("totalAmount") || 0),
-          entryCount: parseInt(item.getDataValue("entryCount") || 0),
-        })),
-        totalSummary: {
-          totalAmount: parseFloat(
-            totalSummary.getDataValue("totalAmount") || 0
-          ),
-          totalEntries: parseInt(
-            totalSummary.getDataValue("totalEntries") || 0
-          ),
-          averageAmount: parseFloat(
-            totalSummary.getDataValue("averageAmount") || 0
-          ),
-        },
-      };
-    } catch (error) {
-      throw new Error(`Error generating cost summary: ${error.message}`);
+    if (startDate || endDate) {
+      whereClause.date = {};
+      if (startDate) whereClause.date[Op.gte] = startDate;
+      if (endDate) whereClause.date[Op.lte] = endDate;
     }
+
+    if (houseId) whereClause.houseId = houseId;
+
+    const sequelize = CostEntry.sequelize;
+    if (!sequelize) {
+      throw new InternalServerError(
+        "Sequelize instance not available for CostEntry model",
+      );
+    }
+
+    const costTypeField =
+      (CostEntry.rawAttributes.costType &&
+        CostEntry.rawAttributes.costType.field) ||
+      "cost_type";
+    const amountField =
+      (CostEntry.rawAttributes.amount &&
+        CostEntry.rawAttributes.amount.field) ||
+      "amount";
+
+    const costsByType = await CostEntry.findAll({
+      where: whereClause,
+      attributes: [
+        [sequelize.col(costTypeField), "costType"],
+        [sequelize.fn("SUM", sequelize.col(amountField)), "totalAmount"],
+        [sequelize.fn("COUNT", sequelize.col("id")), "entryCount"],
+      ],
+      group: [sequelize.col(costTypeField)],
+      order: [[sequelize.fn("SUM", sequelize.col(amountField)), "DESC"]],
+    });
+
+    const categoryField =
+      (CostEntry.rawAttributes.category &&
+        CostEntry.rawAttributes.category.field) ||
+      "category";
+
+    const costsByCategory = await CostEntry.findAll({
+      where: whereClause,
+      attributes: [
+        [sequelize.col(categoryField), "category"],
+        [sequelize.fn("SUM", sequelize.col(amountField)), "totalAmount"],
+        [sequelize.fn("COUNT", sequelize.col("id")), "entryCount"],
+      ],
+      group: [sequelize.col(categoryField)],
+      order: [[sequelize.fn("SUM", sequelize.col(amountField)), "DESC"]],
+    });
+
+    const totalSummary = (await CostEntry.findOne({
+      where: whereClause,
+      attributes: [
+        [sequelize.fn("SUM", sequelize.col("amount")), "totalAmount"],
+        [sequelize.fn("COUNT", sequelize.col("id")), "totalEntries"],
+        [sequelize.fn("AVG", sequelize.col("amount")), "averageAmount"],
+      ],
+    })) as CostEntrySummaryModel | null;
+
+    return {
+      costsByType: costsByType.map((item) => ({
+        costType: item.getDataValue("costType") || null,
+        totalAmount: toNumber(item.getDataValue("totalAmount")),
+        entryCount: Math.trunc(toNumber(item.getDataValue("entryCount"))),
+      })),
+      costsByCategory: costsByCategory.map((item) => ({
+        category: item.getDataValue("category") || null,
+        totalAmount: toNumber(item.getDataValue("totalAmount")),
+        entryCount: Math.trunc(toNumber(item.getDataValue("entryCount"))),
+      })),
+      totalSummary: {
+        totalAmount: toNumber(totalSummary?.getDataValue("totalAmount")),
+        totalEntries: Math.trunc(toNumber(totalSummary?.getDataValue("totalEntries"))),
+        averageAmount: toNumber(totalSummary?.getDataValue("averageAmount")),
+      },
+    };
   }
 
   getCostTypes() {

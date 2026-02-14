@@ -1,7 +1,22 @@
 import costEntryService from "../services/costEntryService.js";
+import type { NextFunction, Request, Response } from "express";
+import { BadRequestError } from "../utils/exceptions.js";
+import { queryFloat, queryInt, queryString } from "../utils/parsers.js";
+import type {
+  CostEntryFiltersInput,
+  CostSummaryFiltersInput,
+} from "../types/dto.js";
+
+const parseIdParam = (id: string | undefined): number => {
+  const parsed = Number.parseInt(id ?? "", 10);
+  if (Number.isNaN(parsed)) {
+    throw new BadRequestError("Invalid id parameter");
+  }
+  return parsed;
+};
 
 class CostEntryController {
-  async createCostEntry(req, res, next) {
+  async createCostEntry(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
       const costEntry = await costEntryService.createCostEntry(
@@ -19,28 +34,26 @@ class CostEntryController {
     }
   }
 
-  async getCostEntries(req, res, next) {
+  async getCostEntries(req: Request, res: Response, next: NextFunction) {
     try {
       const filters = {
-        startDate: req.query.startDate,
-        endDate: req.query.endDate,
-        costType: req.query.costType,
-        category: req.query.category,
-        houseId: req.query.houseId ? parseInt(req.query.houseId) : undefined,
-        createdBy: req.query.createdBy
-          ? parseInt(req.query.createdBy)
-          : undefined,
-        minAmount: req.query.minAmount
-          ? parseFloat(req.query.minAmount)
-          : undefined,
-        maxAmount: req.query.maxAmount
-          ? parseFloat(req.query.maxAmount)
-          : undefined,
+        startDate: queryString(req.query.startDate),
+        endDate: queryString(req.query.endDate),
+        costType: queryString(req.query.costType) as
+          | CostEntryFiltersInput["costType"]
+          | undefined,
+        category: queryString(req.query.category) as
+          | CostEntryFiltersInput["category"]
+          | undefined,
+        houseId: queryInt(req.query.houseId),
+        createdBy: queryInt(req.query.createdBy),
+        minAmount: queryFloat(req.query.minAmount),
+        maxAmount: queryFloat(req.query.maxAmount),
       };
 
       const pagination = {
-        page: req.query.page ? parseInt(req.query.page) : 1,
-        limit: req.query.limit ? parseInt(req.query.limit) : 50,
+        page: queryInt(req.query.page) ?? 1,
+        limit: queryInt(req.query.limit) ?? 50,
       };
 
       const result = await costEntryService.getCostEntries(filters, pagination);
@@ -55,10 +68,10 @@ class CostEntryController {
   }
 
   // Get cost entry by ID
-  async getCostEntry(req, res, next) {
+  async getCostEntry(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const costEntry = await costEntryService.getCostEntryById(parseInt(id));
+      const id = parseIdParam(req.params.id);
+      const costEntry = await costEntryService.getCostEntryById(id);
 
       res.status(200).json({
         success: true,
@@ -70,12 +83,12 @@ class CostEntryController {
   }
 
   // Update cost entry
-  async updateCostEntry(req, res, next) {
+  async updateCostEntry(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = parseIdParam(req.params.id);
       const userId = req.user?.id;
       const costEntry = await costEntryService.updateCostEntry(
-        parseInt(id),
+        id,
         req.body,
         userId
       );
@@ -91,14 +104,10 @@ class CostEntryController {
   }
 
   // Delete cost entry
-  async deleteCostEntry(req, res, next) {
+  async deleteCostEntry(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const userId = req.user?.id;
-      const result = await costEntryService.deleteCostEntry(
-        parseInt(id),
-        userId
-      );
+      const id = parseIdParam(req.params.id);
+      const result = await costEntryService.deleteCostEntry(id);
 
       res.status(200).json({
         success: true,
@@ -110,13 +119,13 @@ class CostEntryController {
   }
 
   // Get cost summary
-  async getCostSummary(req, res, next) {
+  async getCostSummary(req: Request, res: Response, next: NextFunction) {
     try {
       const filters = {
-        startDate: req.query.startDate,
-        endDate: req.query.endDate,
-        groupBy: req.query.groupBy || "month",
-        houseId: req.query.houseId ? parseInt(req.query.houseId) : undefined,
+        startDate: queryString(req.query.startDate),
+        endDate: queryString(req.query.endDate),
+        groupBy: (queryString(req.query.groupBy) || "month") as CostSummaryFiltersInput["groupBy"],
+        houseId: queryInt(req.query.houseId),
       };
 
       const summary = await costEntryService.getCostSummary(filters);
@@ -131,7 +140,7 @@ class CostEntryController {
   }
 
   // Get available cost types
-  async getCostTypes(req, res, next) {
+  async getCostTypes(_req: Request, res: Response, next: NextFunction) {
     try {
       const costTypes = costEntryService.getCostTypes();
 

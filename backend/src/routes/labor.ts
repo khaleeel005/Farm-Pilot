@@ -69,6 +69,13 @@ router.put(
 
 // Payroll - owner only for generate/update, both can read
 router.get(
+  "/payroll/summary",
+  authenticate,
+  authorize(PERMISSIONS.PAYROLL.READ),
+  laborController.payrollSummary
+);
+
+router.get(
   "/payroll/:month_year",
   authenticate,
   authorize(PERMISSIONS.PAYROLL.READ),
@@ -87,12 +94,6 @@ router.put(
   authenticate,
   authorize(PERMISSIONS.PAYROLL.UPDATE),
   laborController.updatePayroll
-);
-router.get(
-  "/payroll/summary",
-  authenticate,
-  authorize(PERMISSIONS.PAYROLL.READ),
-  laborController.payrollSummary
 );
 
 export default router;

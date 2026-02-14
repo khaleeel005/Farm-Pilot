@@ -1,9 +1,9 @@
 import { validationResult } from "express-validator";
+import type { NextFunction, Request, Response } from "express";
 import staffService from "../services/staffService.js";
-import logger from "../config/logger.js";
 
 const staffController = {
-  listStaff: async (req, res, next) => {
+  listStaff: async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const staff = await staffService.list();
       res.json({ success: true, data: staff });
@@ -12,11 +12,13 @@ const staffController = {
     }
   },
 
-  createStaff: async (req, res, next) => {
+  createStaff: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
-      if (!errors.isEmpty())
-        return res.status(400).json({ errors: errors.array() });
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
 
       const { username, password } = req.body;
       const user = await staffService.create({ username, password });
@@ -26,7 +28,7 @@ const staffController = {
     }
   },
 
-  updateStaff: async (req, res, next) => {
+  updateStaff: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       const payload = req.body;
@@ -37,7 +39,7 @@ const staffController = {
     }
   },
 
-  deleteStaff: async (req, res, next) => {
+  deleteStaff: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       await staffService.remove(id);

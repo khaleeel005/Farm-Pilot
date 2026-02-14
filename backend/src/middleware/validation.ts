@@ -1,7 +1,6 @@
 import { body, query, param } from "express-validator";
 import { validationResult } from "express-validator";
-import DailyLog from "../models/DailyLog.js";
-import { BadRequestError } from "../utils/exceptions.js";
+import type { NextFunction, Request, Response } from "express";
 
 export const validateCreateDailyLog = [
   body("logDate")
@@ -18,22 +17,37 @@ export const validateCreateDailyLog = [
     .optional()
     .isInt({ min: 0 })
     .withMessage("crackedEggs must be a non-negative integer"),
-  body("feedGivenKg")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("feedGivenKg must be a non-negative number"),
-  body("feedType").custom((value) => {
+  body("feedBatchId").custom((value) => {
     if (value === null || value === undefined || value === "") {
-      return true; // Allow null, undefined, empty string
+      return true;
     }
-    if (typeof value !== "string") {
-      throw new Error("feedType must be a string");
-    }
-    if (value.length > 50) {
-      throw new Error("feedType must be max 50 characters");
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error("feedBatchId must be a positive integer");
     }
     return true;
   }),
+  body("feedBagsUsed")
+    .custom((value) => {
+      if (value === null || value === undefined || value === "") {
+        return true;
+      }
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("feedBagsUsed must be a non-negative number");
+      }
+      return true;
+    })
+    .custom((value, { req }) => {
+      if (value === null || value === undefined || value === "") {
+        return true;
+      }
+      const batchId = req.body.feedBatchId;
+      if (batchId === null || batchId === undefined || batchId === "") {
+        throw new Error("feedBatchId is required when feedBagsUsed is provided");
+      }
+      return true;
+    }),
   body("mortalityCount")
     .optional()
     .isInt({ min: 0 })
@@ -70,10 +84,27 @@ export const validateUpdateDailyLog = [
     .optional()
     .isInt({ min: 0 })
     .withMessage("crackedEggs must be a non-negative integer"),
-  body("feedGivenKg")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("feedGivenKg must be a non-negative number"),
+  body("feedBatchId").custom((value) => {
+    if (value === null || value === undefined || value === "") {
+      return true;
+    }
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error("feedBatchId must be a positive integer");
+    }
+    return true;
+  }),
+  body("feedBagsUsed")
+    .custom((value) => {
+      if (value === null || value === undefined || value === "") {
+        return true;
+      }
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("feedBagsUsed must be a non-negative number");
+      }
+      return true;
+    }),
   body("mortalityCount")
     .optional()
     .isInt({ min: 0 })
@@ -323,10 +354,15 @@ export const validateUpdateHouse = [
 ];
 
 // Helper to run validationResult and return 400 if errors
-export const handleValidation = (req, res, next) => {
+export const handleValidation = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
+    res.status(400).json({ success: false, errors: errors.array() });
+    return;
   }
   next();
 };

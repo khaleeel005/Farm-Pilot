@@ -2,12 +2,29 @@ import DailyLog from "../models/DailyLog.js";
 import FeedBatch from "../models/FeedBatch.js";
 import OperatingCost from "../models/OperatingCost.js";
 import Payroll from "../models/Payroll.js";
-import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
+import { BadRequestError } from "../utils/exceptions.js";
 import { Op } from "sequelize";
+import type {
+  BirdCostEntity,
+  DailyLogEntity,
+  FeedBatchEntity,
+  OperatingCostEntity,
+  PayrollEntity,
+} from "../types/entities.js";
+
+type DailyLogWithLegacyFeed = DailyLogEntity & {
+  feedGivenKg?: number | string | null;
+};
+
+const toDailyLogs = (rows: unknown): DailyLogWithLegacyFeed[] =>
+  rows as DailyLogWithLegacyFeed[];
+
+const toPayrollRows = (rows: unknown): PayrollEntity[] => rows as PayrollEntity[];
 
 const costService = {
   // Helper function to get average monthly production (Design 7.1)
-  getAverageMonthlyProduction: async (date) => {
+  getAverageMonthlyProduction: async (date: string | undefined) => {
+    if (!date) throw new BadRequestError("date is required");
     const monthKey = date.substring(0, 7); // YYYY-MM
     const parts = date.split("-");
     const year = Number(parts[0]);
@@ -17,9 +34,9 @@ const costService = {
     const monthStart = monthKey + "-01";
     const monthEnd = `${monthKey}-${daysInMonth.toString().padStart(2, "0")}`;
 
-    const monthlyLogs = await DailyLog.findAll({
+    const monthlyLogs = toDailyLogs(await DailyLog.findAll({
       where: { logDate: { [Op.between]: [monthStart, monthEnd] } },
-    });
+    }));
 
     if (monthlyLogs.length === 0) return 0;
 
@@ -32,7 +49,8 @@ const costService = {
   },
 
   // Helper function to get working days in month (excluding Sundays)
-  getWorkingDaysInMonth: (date) => {
+  getWorkingDaysInMonth: (date: string | undefined) => {
+    if (!date) throw new BadRequestError("date is required");
     const parts = date.split("-");
     const year = Number(parts[0]);
     const month = Number(parts[1]);
@@ -49,11 +67,11 @@ const costService = {
     return workingDays;
   },
 
-  getDailyCosts: async (date) => {
+  getDailyCosts: async (date: string | undefined) => {
     if (!date) throw new BadRequestError("date is required");
 
     // aggregate daily logs
-    const logs = await DailyLog.findAll({ where: { logDate: date } });
+    const logs = toDailyLogs(await DailyLog.findAll({ where: { logDate: date } }));
 
     // coerce values (Sequelize may return DECIMAL as strings)
     const totalEggs = logs.reduce(
@@ -63,7 +81,7 @@ const costService = {
 
     // feed cost: sum feedBagsUsed * estimate price per bag from recent feed batches
     const totalFeedBags = logs.reduce(
-      (s, l) => s + (Number(l.feedBagsUsed) || 0),
+      (s, l) => s + (Number(l.feedBagsUsed ?? 0) || 0),
       0
     );
 
@@ -71,9 +89,9 @@ const costService = {
     let totalFeedKg = 0;
     if (totalFeedBags > 0) {
       // approximate by using latest feed batch costPerBag
-      const latestBatch = await FeedBatch.findOne({
+      const latestBatch = (await FeedBatch.findOne({
         order: [["batchDate", "DESC"]],
-      });
+      })) as FeedBatchEntity | null;
       const costPerBag = latestBatch ? Number(latestBatch.costPerBag) || 0 : 0;
       const bagSizeKg = latestBatch ? Number(latestBatch.bagSizeKg) || 50 : 50;
       feedCost = totalFeedBags * costPerBag;
@@ -89,31 +107,33 @@ const costService = {
     };
   },
 
-  getSummary: async (start, end) => {
+  getSummary: async (start: string | undefined, end: string | undefined) => {
     if (!start || !end) throw new BadRequestError("start and end are required");
-    const logs = await DailyLog.findAll({
+    const logs = toDailyLogs(await DailyLog.findAll({
       where: { logDate: { [Op.between]: [start, end] } },
-    });
+    }));
     const totalEggs = logs.reduce(
       (s, l) => s + (Number(l.eggsCollected) || 0),
       0
     );
     const totalFeedBags = logs.reduce(
-      (s, l) => s + (Number(l.feedBagsUsed) || 0),
+      (s, l) => s + (Number(l.feedBagsUsed ?? 0) || 0),
       0
     );
     
     // Get bag size from latest batch for kg conversion
-    const latestBatch = await FeedBatch.findOne({
+    const latestBatch = (await FeedBatch.findOne({
       order: [["batchDate", "DESC"]],
-    });
+    })) as FeedBatchEntity | null;
     const bagSizeKg = latestBatch ? Number(latestBatch.bagSizeKg) || 50 : 50;
     const totalFeedKg = totalFeedBags * bagSizeKg;
 
     return { start, end, totalEggs, totalFeedKg, totalFeedBags };
   },
 
-  createOperatingCosts: async (data) => {
+  createOperatingCosts: async (
+    data: Partial<OperatingCostEntity> & { monthYear: string },
+  ) => {
     if (!data.monthYear) throw new BadRequestError("monthYear is required");
     // normalize month key for payroll lookup (YYYY-MM)
     const monthKey = (data.monthYear || "").toString().slice(0, 7);
@@ -126,9 +146,9 @@ const costService = {
     // If totalLaborerSalaries not provided, use Payroll records for the month
     let laborSalaries = Number(data.totalLaborerSalaries || 0);
     if (!laborSalaries) {
-      const payrollRows = await Payroll.findAll({
+      const payrollRows = toPayrollRows(await Payroll.findAll({
         where: { monthYear: monthKey },
-      });
+      }));
       laborSalaries = payrollRows.reduce(
         (s, p) => s + (Number(p.finalSalary) || 0),
         0
@@ -136,12 +156,12 @@ const costService = {
     }
 
     const totalMonthlyCost =
-      (data.supervisorSalary || 0) +
+      (Number(data.supervisorSalary) || 0) +
       laborSalaries +
-      (data.electricityCost || 0) +
-      (data.waterCost || 0) +
-      (data.maintenanceCost || 0) +
-      (data.otherCosts || 0);
+      (Number(data.electricityCost) || 0) +
+      (Number(data.waterCost) || 0) +
+      (Number(data.maintenanceCost) || 0) +
+      (Number(data.otherCosts) || 0);
 
     const oc = await OperatingCost.create({
       ...data,
@@ -151,7 +171,7 @@ const costService = {
     return oc;
   },
 
-  getEggPriceEstimate: async (date) => {
+  getEggPriceEstimate: async (date: string | undefined) => {
     if (!date) throw new BadRequestError("date is required");
 
     // Get daily costs for feed
@@ -176,18 +196,18 @@ const costService = {
         : daily.totalEggs || 1;
 
     // Get monthly labor costs from payroll (Design 7.3)
-    const payrollRows = await Payroll.findAll({
+    const payrollRows = toPayrollRows(await Payroll.findAll({
       where: { monthYear: monthKey },
-    });
+    }));
     const monthlyLaborCosts = payrollRows.reduce(
       (s, p) => s + (Number(p.finalSalary) || 0),
       0
     );
 
     // Get other operating costs for the month (supervisor, utilities, etc.)
-    const op = await OperatingCost.findOne({
+    const op = (await OperatingCost.findOne({
       where: { monthYear: monthStart },
-    });
+    })) as OperatingCostEntity | null;
     const monthlyOperatingCosts = op
       ? (Number(op.supervisorSalary) || 0) +
         (Number(op.electricityCost) || 0) +
@@ -226,35 +246,40 @@ const costService = {
   },
 
   // Calculate health costs per egg (bird acquisition costs distributed over laying period)
-  calculateHealthCostPerEgg: async (date) => {
+  calculateHealthCostPerEgg: async (date: string | undefined) => {
     if (!date) return 0;
 
     // Import BirdCost lazily to avoid circular deps
-    let BirdCost;
+    type BirdCostModel = {
+      findAll: () => Promise<unknown[]>;
+    };
+    let birdCostModel: BirdCostModel | null = null;
     try {
-      const { default: BirdCostModel } = await import("../models/BirdCost.js");
-      BirdCost = BirdCostModel;
+      const imported = (await import("../models/BirdCost.js")) as {
+        default?: BirdCostModel;
+      };
+      birdCostModel = imported.default ?? null;
       // Test if the model is properly initialized
-      if (!BirdCost || typeof BirdCost.findAll !== 'function') {
+      if (!birdCostModel || typeof birdCostModel.findAll !== "function") {
         return 0;
       }
-    } catch (e) {
+    } catch {
       // model not present or import failed
       return 0;
     }
 
     // Get total eggs produced on the date
-    const logs = await DailyLog.findAll({ where: { logDate: date } });
+    const logs = toDailyLogs(await DailyLog.findAll({ where: { logDate: date } }));
     const totalEggs = logs.reduce(
       (s, l) => s + (Number(l.eggsCollected) || 0),
       0
     );
 
     // Find bird batches whose laying window includes the date
-    let allBatches = [];
+    let allBatches: BirdCostEntity[] = [];
     try {
-      allBatches = await BirdCost.findAll();
-    } catch (e) {
+      allBatches = (await birdCostModel.findAll()) as BirdCostEntity[];
+    } catch {
       // Database table might not exist
       return 0;
     }
@@ -294,11 +319,11 @@ const costService = {
   },
 
   // Daily cost calculation as per Design 7.1
-  calculateDailyCost: async (date) => {
+  calculateDailyCost: async (date: string | undefined) => {
     if (!date) throw new BadRequestError("date is required");
 
     // Get daily production data
-    const dailyLogs = await DailyLog.findAll({ where: { logDate: date } });
+    const dailyLogs = toDailyLogs(await DailyLog.findAll({ where: { logDate: date } }));
     const totalEggs = dailyLogs.reduce(
       (sum, log) => sum + (Number(log.eggsCollected) || 0),
       0
@@ -318,17 +343,28 @@ const costService = {
     }
 
     // Calculate feed cost
-    const totalFeedKg = dailyLogs.reduce(
-      (sum, log) => sum + (Number(log.feedGivenKg) || 0),
-      0
-    );
+    const latestBatchForFeed = (await FeedBatch.findOne({
+      order: [["batchDate", "DESC"]],
+    })) as FeedBatchEntity | null;
+    const bagSizeKg = latestBatchForFeed
+      ? Number(latestBatchForFeed.bagSizeKg) || 50
+      : 50;
+    const costPerKg = latestBatchForFeed
+      ? Number(latestBatchForFeed.costPerKg) || 0
+      : 0;
+
+    const totalFeedKg = dailyLogs.reduce((sum, log) => {
+      const legacyFeedKg = Number(log.feedGivenKg ?? 0);
+      if (legacyFeedKg > 0) {
+        return sum + legacyFeedKg;
+      }
+
+      const feedBagsUsed = Number(log.feedBagsUsed ?? 0);
+      return sum + feedBagsUsed * bagSizeKg;
+    }, 0);
 
     let feedCost = 0;
     if (totalFeedKg > 0) {
-      const latestBatch = await FeedBatch.findOne({
-        order: [["batchDate", "DESC"]],
-      });
-      const costPerKg = latestBatch ? Number(latestBatch.costPerKg) || 0 : 0;
       feedCost = totalFeedKg * costPerKg;
     }
     const feedCostPerEgg = feedCost / totalEggs;
@@ -340,11 +376,11 @@ const costService = {
     const month = Number(parts[1]);
     const daysInMonth = new Date(year, month, 0).getDate();
 
-    const payrollRows = await Payroll.findAll({
+    const payrollRows = toPayrollRows(await Payroll.findAll({
       where: { monthYear: monthKey },
-    });
+    }));
     const monthlyLaborCosts = payrollRows.reduce(
-      (sum, p) => sum + (Number(p.netPay) || 0),
+      (sum, p) => sum + (Number(p.finalSalary) || 0),
       0
     );
 
@@ -357,9 +393,9 @@ const costService = {
 
     // Calculate other fixed costs (supervisor, utilities, etc.)
     const monthStart = monthKey + "-01";
-    const op = await OperatingCost.findOne({
+    const op = (await OperatingCost.findOne({
       where: { monthYear: monthStart },
-    });
+    })) as OperatingCostEntity | null;
     const monthlyOperatingCosts = op
       ? (Number(op.supervisorSalary) || 0) +
         (Number(op.electricityCost) || 0) +

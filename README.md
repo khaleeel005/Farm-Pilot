@@ -6,8 +6,8 @@ Modern farm management system with separated backend and frontend architecture.
 
 This project uses a **separated architecture**:
 
-- **Backend**: Express + TypeScript API (port 5001)
-- **Frontend**: Rsbuild + React + TanStack (port 3000)
+- **Backend**: Express + TypeScript API
+- **Frontend**: Rsbuild + React + TanStack
 
 ```
 farm-manager/
@@ -22,7 +22,7 @@ farm-manager/
 
 - Node.js 22 or higher
 - pnpm (install with `npm install -g pnpm`)
-- PostgreSQL database
+- Docker (recommended for local PostgreSQL) or a local PostgreSQL installation
 
 ### Installation
 
@@ -52,10 +52,15 @@ farm-manager/
 
    ```bash
    cp frontend/.env.example frontend/.env
-   # Usually no changes needed
+   # Set API_URL to your backend origin
    ```
 
-4. **Run database migrations**:
+4. **Start local database**:
+   ```bash
+   pnpm db:up
+   ```
+
+5. **Run database migrations**:
    ```bash
    cd backend && pnpm db:migrate
    ```
@@ -80,9 +85,9 @@ pnpm dev:frontend
 
 **Access the application**:
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5001
-- API Health: http://localhost:5001/api/health
+- Frontend: use the frontend host/port from your frontend config
+- Backend API: use the backend host/port from `backend/.env` (`PORT`)
+- API Health: `<backend-origin>/api/health`
 
 ## 📦 Backend
 
@@ -148,6 +153,8 @@ pnpm build            # Build TypeScript
 pnpm start            # Production server
 pnpm test             # Run tests
 pnpm typecheck        # Check types
+pnpm db:up            # Start local PostgreSQL (Docker)
+pnpm db:down          # Stop local PostgreSQL (Docker)
 pnpm db:migrate       # Run migrations
 ```
 
@@ -224,6 +231,7 @@ Full API documentation: [backend/README.md](backend/README.md)
 
 ```bash
 cd backend
+pnpm db:up             # Start local PostgreSQL
 pnpm db:migrate        # Run migrations
 pnpm db:migrate:undo   # Rollback migration
 ```
@@ -238,12 +246,9 @@ The application uses **JWT-based authentication** with HTTP-only cookies:
 4. Frontend sends cookie with each request
 5. Backend validates token on protected routes
 
-**Default Admin**:
+**Admin Bootstrap**:
 
-- Username: `admin`
-- Password: `admin123`
-
-⚠️ **Change the default password in production!**
+- The initial admin account is created from `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `ADMIN_NAME` in `backend/.env`.
 
 ## 🎯 Features
 

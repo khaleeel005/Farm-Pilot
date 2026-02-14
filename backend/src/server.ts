@@ -1,3 +1,4 @@
+import './config/loadEnv.js';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -9,9 +10,35 @@ import errorHandler from './middleware/errorHandler.js';
 import requestLogger from './middleware/logger.js';
 import logger from './config/logger.js';
 
-const dev = process.env.NODE_ENV !== 'production';
-const PORT = process.env.PORT || 5001;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} must be set`);
+  }
+  return value;
+}
+
+function parseOrigins(raw: string): string[] {
+  const origins = raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  if (origins.length === 0) {
+    throw new Error('FRONTEND_URL must contain at least one origin');
+  }
+
+  return origins;
+}
+
+const NODE_ENV = requireEnv('NODE_ENV');
+const dev = NODE_ENV !== 'production';
+const PORT = Number.parseInt(requireEnv('PORT'), 10);
+const FRONTEND_URLS = parseOrigins(requireEnv('FRONTEND_URL'));
+
+if (Number.isNaN(PORT)) {
+  throw new Error('PORT must be a valid integer');
+}
 
 const app = express();
 
@@ -57,7 +84,7 @@ app.use('/api/auth/login', authLimiter);
 // CORS - allow frontend origin
 app.use(
   cors({
-    origin: dev ? [FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'] : FRONTEND_URL,
+    origin: FRONTEND_URLS,
     credentials: true,
   })
 );
@@ -73,13 +100,13 @@ app.use('/api', requestLogger);
 app.use('/api', routes);
 
 // Health check endpoint
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Farm Manager API is running',
     timestamp: new Date().toISOString(),
     port: PORT,
-    environment: process.env.NODE_ENV || 'development',
+    environment: NODE_ENV,
   });
 });
 
@@ -92,10 +119,10 @@ app.use('/api', errorHandler);
     logger.info('==================================================');
     logger.info('Farm Manager Backend API Starting');
     logger.info('==================================================');
-    logger.info(`Environment: ${dev ? 'development' : 'production'}`);
+    logger.info(`Environment: ${NODE_ENV}`);
     logger.info(`Node Version: ${process.version}`);
     logger.info(`Port: ${PORT}`);
-    logger.info(`Frontend URL: ${FRONTEND_URL}`);
+    logger.info(`Frontend URLs: ${FRONTEND_URLS.join(', ')}`);
 
     // Initialize database
     logger.info('Initializing database...');
@@ -109,19 +136,20 @@ app.use('/api', errorHandler);
 
     app.listen(PORT, () => {
       logger.info('==================================================');
-      logger.info(`✓ API Server is ready on http://localhost:${PORT}`);
+      logger.info(`✓ API Server is ready on port ${PORT}`);
       logger.info('  - API endpoints: /api/*');
       logger.info('  - Health check: /api/health');
       logger.info('==================================================');
     });
   } catch (err) {
+    const startupError = err as Error & { code?: string };
     logger.error('==================================================');
     logger.error('✗ Failed to start the server');
     logger.error('==================================================');
     logger.error('Error details:', {
-      message: (err as Error).message,
-      code: (err as any).code,
-      stack: (err as Error).stack,
+      message: startupError.message,
+      code: startupError.code,
+      stack: startupError.stack,
     });
     process.exit(1);
   }

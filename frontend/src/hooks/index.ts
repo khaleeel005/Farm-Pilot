@@ -11,9 +11,6 @@ export type { UseDailyLogsReturn, DailyLogFilters } from './useDailyLogs';
 export { useSales } from './useSales';
 export type { UseSalesReturn, SalesFilters, SalesSummary } from './useSales';
 
-export { useToast } from './useToast';
-export type { Toast, ToastType } from './useToast';
-
 // Re-export toast context for global usage
 export { useToastContext } from '@/context/ToastContext';
 

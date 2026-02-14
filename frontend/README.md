@@ -10,7 +10,13 @@ pnpm install
 
 ## Get started
 
-Start the dev server, and the app will be available at [http://localhost:3000](http://localhost:3000).
+Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+Start the dev server. The app host/port is configured by your Rsbuild server settings.
 
 ```bash
 pnpm run dev

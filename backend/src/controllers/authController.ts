@@ -1,15 +1,18 @@
 import authService from "../services/authService.js";
 import { validationResult } from "express-validator";
+import type { NextFunction, Request, Response } from "express";
+import { UnauthorizedError } from "../utils/exceptions.js";
 
 const authController = {
   /**
    * Login a user and return a JWT token.
    */
-  login: async (req, res, next) => {
+  login: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        res.status(400).json({ errors: errors.array() });
+        return;
       }
 
       const { username, password } = req.body;
@@ -34,8 +37,11 @@ const authController = {
   /**
    * Get current user information.
    */
-  getCurrentUser: async (req, res, next) => {
+  getCurrentUser: async (req: Request, res: Response, next: NextFunction) => {
     try {
+      if (!req.user) {
+        throw new UnauthorizedError("User is not authenticated");
+      }
       const user = await authService.getCurrentUser(req.user.id);
       res.status(200).json({
         success: true,
@@ -49,7 +55,7 @@ const authController = {
   /**
    * Logout a user (invalidate token if applicable).
    */
-  logout: (req, res) => {
+  logout: (_req: Request, res: Response) => {
     // Token invalidation logic can be added here if using a token blacklist.
     res.status(200).json({ success: true, message: "Logged out successfully" });
   },
@@ -57,7 +63,7 @@ const authController = {
   /**
    * Refresh the JWT token.
    */
-  refresh: async (req, res, next) => {
+  refresh: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { refreshToken } = req.body;
       const newToken = await authService.refreshToken(refreshToken);

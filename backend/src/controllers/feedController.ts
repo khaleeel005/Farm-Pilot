@@ -1,9 +1,10 @@
 import feedBatchService from "../services/feedBatchService.js";
 import feedBatchStatsService from "../services/feedBatchStatsService.js";
+import type { NextFunction, Request, Response } from "express";
 
 const feedController = {
   // Batches
-  createBatch: async (req, res, next) => {
+  createBatch: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const batch = await feedBatchService.createFeedBatch(req.body);
       res.status(201).json({ success: true, data: batch });
@@ -12,7 +13,7 @@ const feedController = {
     }
   },
 
-  getAllBatches: async (req, res, next) => {
+  getAllBatches: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const batches = await feedBatchService.getAllFeedBatches(req.query);
       res.json({ success: true, data: batches });
@@ -21,7 +22,7 @@ const feedController = {
     }
   },
 
-  getBatchById: async (req, res, next) => {
+  getBatchById: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const batch = await feedBatchService.getFeedBatchById(req.params.id);
       res.json({ success: true, data: batch });
@@ -30,7 +31,7 @@ const feedController = {
     }
   },
 
-  updateBatch: async (req, res, next) => {
+  updateBatch: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await feedBatchService.updateFeedBatch(
         req.params.id,
@@ -42,7 +43,7 @@ const feedController = {
     }
   },
 
-  deleteBatch: async (req, res, next) => {
+  deleteBatch: async (req: Request, res: Response, next: NextFunction) => {
     try {
       await feedBatchService.deleteFeedBatch(req.params.id);
       res
@@ -54,7 +55,7 @@ const feedController = {
   },
 
   // Batch ingredients
-  addIngredient: async (req, res, next) => {
+  addIngredient: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const ingredient = await feedBatchService.addBatchIngredient(
         req.params.id,
@@ -66,7 +67,11 @@ const feedController = {
     }
   },
 
-  getBatchIngredients: async (req, res, next) => {
+  getBatchIngredients: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const ingredients = await feedBatchService.getBatchIngredients(
         req.params.id,
@@ -77,7 +82,7 @@ const feedController = {
     }
   },
 
-  updateIngredient: async (req, res, next) => {
+  updateIngredient: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await feedBatchService.updateBatchIngredient(
         req.params.ingredientId,
@@ -89,7 +94,7 @@ const feedController = {
     }
   },
 
-  deleteIngredient: async (req, res, next) => {
+  deleteIngredient: async (req: Request, res: Response, next: NextFunction) => {
     try {
       await feedBatchService.removeBatchIngredient(req.params.ingredientId);
       res
@@ -101,7 +106,11 @@ const feedController = {
   },
 
   // Calculate batch cost
-  calculateBatchCost: async (req, res, next) => {
+  calculateBatchCost: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const { ingredients, bagSizeKg, miscellaneousCost } = req.body;
       const result = await feedBatchService.calculateBatchCost(
@@ -116,7 +125,11 @@ const feedController = {
   },
 
   // Get batch usage statistics
-  getBatchUsageStats: async (req, res, next) => {
+  getBatchUsageStats: async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const stats = await feedBatchStatsService.getAllBatchUsageStats();
       res.json({ success: true, data: stats });
@@ -126,7 +139,7 @@ const feedController = {
   },
 
   // Get individual batch usage stats
-  getBatchUsageById: async (req, res, next) => {
+  getBatchUsageById: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const stats = await feedBatchStatsService.getBatchUsageStats(
         req.params.id,

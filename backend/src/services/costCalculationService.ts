@@ -6,14 +6,18 @@ import costService from "./costService.js";
 const costCalculationService = {
   calculateDailyCost: costService.calculateDailyCost,
   getEggPriceEstimate: costService.getEggPriceEstimate,
-  updateDailyCosts: async (date) => {
+  updateDailyCosts: async (date: string) => {
     // optional helper used by some legacy code paths: compute and persist daily_costs
     const calc = await costService.calculateDailyCost(date);
     // persist into daily_costs table if model exists
     try {
-      const DailyCost = (await import("../models/index.js")).DailyCost;
-      if (DailyCost) {
-        await DailyCost.upsert({
+      const models = (await import("../models/index.js")) as Record<
+        string,
+        { upsert?: (payload: Record<string, unknown>) => Promise<unknown> }
+      >;
+      const dailyCostModel = models.DailyCost;
+      if (dailyCostModel?.upsert) {
+        await dailyCostModel.upsert({
           cost_date: date,
           total_feed_cost: calc.feedCostPerEgg * calc.totalEggs || 0,
           total_eggs_produced: calc.totalEggs || 0,
@@ -24,7 +28,7 @@ const costCalculationService = {
           suggested_price: calc.suggestedPrice,
         });
       }
-    } catch (e) {
+    } catch {
       // non-fatal; model may not exist or DB not migrated yet
       // console.warn("Could not persist daily cost:", e);
     }

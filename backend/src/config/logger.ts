@@ -26,9 +26,7 @@ const format = winston.format.combine(
   )
 );
 
-const transports = [
-  new winston.transports.Console(),
-];
+const transports: winston.transport[] = [new winston.transports.Console()];
 
 // Only add file logging in development/local environment
 if (process.env.NODE_ENV !== "production") {

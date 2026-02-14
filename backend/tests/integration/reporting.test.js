@@ -1,5 +1,5 @@
 import request from "supertest";
-import { sequelize, autoMigrate } from "../../src/utils/database.js";
+import { sequelize, autoMigrate } from "../../dist/utils/database.js";
 import app from "../../testApp.js";
 import bcrypt from "bcrypt";
 
@@ -8,20 +8,22 @@ describe("Reporting Flow", () => {
   let supervisorToken;
   let houseId;
   let customerId;
+  let feedBatchId;
 
   beforeAll(async () => {
     await autoMigrate();
 
     // Create test users, house, and customer
-    const { default: User } = await import("../../src/models/User.js");
-    const { default: House } = await import("../../src/models/House.js");
-    const { default: Customer } = await import("../../src/models/Customer.js");
+    const { default: User } = await import("../../dist/models/User.js");
+    const { default: House } = await import("../../dist/models/House.js");
+    const { default: Customer } = await import("../../dist/models/Customer.js");
+    const { default: FeedBatch } = await import("../../dist/models/FeedBatch.js");
 
     const ownerHash = await bcrypt.hash("owner123", 10);
     await User.create({
       username: "testowner",
       password: ownerHash,
-      role: "Owner",
+      role: "owner",
       fullName: "Test Owner",
     });
 
@@ -51,6 +53,19 @@ describe("Reporting Flow", () => {
     });
     customerId = customer.id;
 
+    const feedBatch = await FeedBatch.create({
+      batchDate: "2025-08-01",
+      batchName: "Reports Test Batch",
+      totalQuantityTons: 1,
+      bagSizeKg: 50,
+      totalBags: 20,
+      totalCost: 1000,
+      costPerBag: 50,
+      costPerKg: 1,
+      miscellaneousCost: 0,
+    });
+    feedBatchId = feedBatch.id;
+
     // Login to get tokens BEFORE creating sample data
     const ownerLoginRes = await request(app)
       .post("/api/auth/login")
@@ -78,6 +93,7 @@ describe("Reporting Flow", () => {
         logDate: date,
         houseId: houseId,
         eggsCollected: Math.floor(Math.random() * 95) + 100,
+        feedBatchId: feedBatchId,
         feedBagsUsed: Math.floor(Math.random() * 3) + 1,
         mortalityCount: Math.floor(Math.random() * 3),
         notes: `Sample data for ${date}`,
@@ -276,14 +292,14 @@ describe("Reporting Flow", () => {
     }
   });
 
-  test("15. Supervisor can access reports", async () => {
+  test("15. Supervisor cannot access reports", async () => {
     const res = await auth(supervisorToken)(
       request(app).get(
         "/api/reports/production?start=2025-08-01&end=2025-08-31"
       )
     );
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(403);
   });
 
   test("16. Test report caching (if implemented)", async () => {

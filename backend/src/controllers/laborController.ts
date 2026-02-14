@@ -1,7 +1,9 @@
 import laborService from "../services/laborService.js";
+import type { NextFunction, Request, Response } from "express";
+import { queryString } from "../utils/parsers.js";
 
 const laborController = {
-  getAll: async (req, res, next) => {
+  getAll: async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await laborService.getAllLaborers();
       res.status(200).json({ success: true, data });
@@ -10,7 +12,7 @@ const laborController = {
     }
   },
 
-  create: async (req, res, next) => {
+  create: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const l = await laborService.createLaborer(req.body);
       res.status(201).json({ success: true, data: l });
@@ -19,7 +21,7 @@ const laborController = {
     }
   },
 
-  update: async (req, res, next) => {
+  update: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await laborService.updateLaborer(req.params.id, req.body);
       res.status(200).json({ success: true, data: updated });
@@ -28,7 +30,7 @@ const laborController = {
     }
   },
 
-  delete: async (req, res, next) => {
+  delete: async (req: Request, res: Response, next: NextFunction) => {
     try {
       await laborService.deleteLaborer(req.params.id);
       res.status(204).json({ success: true });
@@ -38,7 +40,7 @@ const laborController = {
   },
 
   // Work assignments
-  getAssignments: async (req, res, next) => {
+  getAssignments: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rows = await laborService.getWorkAssignments(req.query);
       res.status(200).json({ success: true, data: rows });
@@ -47,7 +49,7 @@ const laborController = {
     }
   },
 
-  createAssignment: async (req, res, next) => {
+  createAssignment: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const a = await laborService.createWorkAssignment(req.body);
       res.status(201).json({ success: true, data: a });
@@ -56,7 +58,7 @@ const laborController = {
     }
   },
 
-  updateAssignment: async (req, res, next) => {
+  updateAssignment: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const u = await laborService.updateWorkAssignment(
         req.params.id,
@@ -69,7 +71,7 @@ const laborController = {
   },
 
   // Payroll
-  getPayrollMonth: async (req, res, next) => {
+  getPayrollMonth: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await laborService.getPayrollForMonth(req.params.month_year);
       res.status(200).json({ success: true, data });
@@ -78,7 +80,7 @@ const laborController = {
     }
   },
 
-  generatePayroll: async (req, res, next) => {
+  generatePayroll: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const created = await laborService.generatePayrollForMonth(
         req.params.month_year
@@ -89,7 +91,7 @@ const laborController = {
     }
   },
 
-  updatePayroll: async (req, res, next) => {
+  updatePayroll: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await laborService.updatePayroll(req.params.id, req.body);
       res.status(200).json({ success: true, data: updated });
@@ -98,9 +100,9 @@ const laborController = {
     }
   },
 
-  payrollSummary: async (req, res, next) => {
+  payrollSummary: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const s = await laborService.getPayrollSummary(req.query.year);
+      const s = await laborService.getPayrollSummary(queryString(req.query.year));
       res.status(200).json({ success: true, data: s });
     } catch (err) {
       next(err);

@@ -1,4 +1,5 @@
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import feedController from "../controllers/feedController.js";
 import {
   validateCreateFeedBatch,
@@ -46,7 +47,7 @@ router.post(
   authorize(PERMISSIONS.FEED.CREATE),
   validateCreateRecipe,
   handleValidation,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const recipe = await feedRecipeService.createFeedRecipe(req.body);
       res.status(201).json({ success: true, data: recipe });
@@ -56,21 +57,25 @@ router.post(
   }
 );
 
-router.get("/recipes", authorize(PERMISSIONS.FEED.READ), async (req, res, next) => {
-  try {
-    const recipes = await feedRecipeService.getAllFeedRecipes(req.query);
-    res.json({ success: true, data: recipes });
-  } catch (err) {
-    next(err);
-  }
-});
+router.get(
+  "/recipes",
+  authorize(PERMISSIONS.FEED.READ),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const recipes = await feedRecipeService.getAllFeedRecipes(req.query);
+      res.json({ success: true, data: recipes });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get(
   "/recipes/:id",
   authorize(PERMISSIONS.FEED.READ),
   validateId,
   handleValidation,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const recipe = await feedRecipeService.getFeedRecipeById(req.params.id);
       res.json({ success: true, data: recipe });
@@ -85,7 +90,7 @@ router.put(
   authorize(PERMISSIONS.FEED.UPDATE),
   validateId,
   handleValidation,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const updated = await feedRecipeService.updateFeedRecipe(
         req.params.id,
@@ -103,7 +108,7 @@ router.delete(
   authorize(PERMISSIONS.FEED.DELETE),
   validateId,
   handleValidation,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       await feedRecipeService.deleteFeedRecipe(req.params.id);
       res.json({ success: true, message: "Recipe deleted successfully" });
