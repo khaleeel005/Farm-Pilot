@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({
         to: "/login",
         search: {
-          redirect: `${location.pathname}${location.search}`,
+          redirect: location.pathname,
         },
       });
     }
@@ -85,7 +85,12 @@ function AuthenticatedLayout() {
 
   const staffNavItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/" },
-    { id: "daily-entry", label: "Daily Entry", icon: Plus, path: "/daily-entry" },
+    {
+      id: "daily-entry",
+      label: "Daily Entry",
+      icon: Plus,
+      path: "/daily-entry",
+    },
     { id: "sales", label: "Sales", icon: CircleDollarSign, path: "/sales" },
     { id: "feed", label: "Feed Management", icon: Package, path: "/feed" },
     { id: "houses", label: "House Management", icon: Egg, path: "/houses" },

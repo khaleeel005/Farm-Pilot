@@ -47,6 +47,14 @@ if (!dev) {
   app.set('trust proxy', 1);
 }
 
+// CORS - allow frontend origin (must be before other middleware)
+app.use(
+  cors({
+    origin: FRONTEND_URLS,
+    credentials: true,
+  })
+);
+
 // Security middleware
 app.use(
   helmet({
@@ -80,14 +88,6 @@ const authLimiter = rateLimit({
   },
 });
 app.use('/api/auth/login', authLimiter);
-
-// CORS - allow frontend origin
-app.use(
-  cors({
-    origin: FRONTEND_URLS,
-    credentials: true,
-  })
-);
 
 // Body parsing
 app.use(express.json({ limit: '10kb' }));
