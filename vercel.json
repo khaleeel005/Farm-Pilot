@@ -1,12 +1,12 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "installCommand": "npm install -g pnpm@10.12.2 && pnpm install --no-frozen-lockfile",
-    "buildCommand": "pnpm build:frontend",
-    "outputDirectory": "frontend/dist",
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack enable && corepack prepare pnpm@10.12.2 --activate && pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm build:frontend",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
