@@ -271,7 +271,7 @@ export async function autoMigrate() {
       try {
         const { execSync } = await import('child_process');
         logger.info('Running migrations via sequelize-cli...');
-        execSync('npx sequelize db:migrate', { stdio: 'inherit' });
+        execSync('npx sequelize-cli db:migrate', { stdio: 'inherit' });
         logger.info('✓ Migrations completed successfully.');
         migrationComplete = true;
         return;

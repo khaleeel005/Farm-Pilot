@@ -12,8 +12,9 @@
     "db:up": "docker compose --env-file .env up -d",
     "db:down": "docker compose --env-file .env down",
     "db:logs": "docker compose --env-file .env logs -f postgres",
-    "db:migrate": "sequelize db:migrate",
-    "db:migrate:undo": "sequelize db:migrate:undo",
+    "db:migration:generate": "sequelize-cli migration:generate",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
