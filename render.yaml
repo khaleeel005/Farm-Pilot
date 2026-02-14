@@ -6,7 +6,7 @@ services:
       plan: free
       autoDeploy: true
       healthCheckPath: /api/health
-      buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm build
+      buildCommand: pnpm install --no-frozen-lockfile --prod=false && pnpm build
       startCommand: pnpm start
       envVars:
           - key: NODE_ENV
