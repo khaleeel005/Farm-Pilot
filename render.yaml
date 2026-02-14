@@ -6,10 +6,7 @@ services:
       plan: free
       autoDeploy: true
       healthCheckPath: /api/health
-      buildCommand: |
-          corepack enable
-          pnpm install --frozen-lockfile --prod=false
-          pnpm build
+      buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm build
       startCommand: pnpm start
       envVars:
           - key: NODE_ENV
