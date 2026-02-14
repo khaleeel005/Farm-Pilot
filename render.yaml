@@ -1,0 +1,48 @@
+services:
+    - type: web
+      name: farm-pilot-api
+      env: node
+      rootDir: backend
+      plan: free
+      autoDeploy: true
+      healthCheckPath: /api/health
+      buildCommand: |
+          corepack enable
+          pnpm install --frozen-lockfile --prod=false
+          pnpm build
+      startCommand: pnpm start
+      envVars:
+          - key: NODE_ENV
+            value: production
+          - key: FRONTEND_URL
+            sync: false
+          - key: DB_DIALECT
+            value: postgres
+          - key: DB_LOG
+            value: "false"
+          - key: DB_SSL
+            value: "false"
+          - key: DATABASE_URL
+            fromDatabase:
+                name: farm-pilot-db
+                property: connectionString
+          - key: USE_MIGRATIONS
+            value: "true"
+          - key: JWT_SECRET
+            generateValue: true
+          - key: JWT_REFRESH_SECRET
+            generateValue: true
+          - key: JWT_EXPIRES_IN
+            value: 24h
+          - key: JWT_REFRESH_EXPIRES_IN
+            value: 7d
+          - key: ADMIN_USERNAME
+            sync: false
+          - key: ADMIN_PASSWORD
+            sync: false
+          - key: ADMIN_NAME
+            sync: false
+
+databases:
+    - name: farm-pilot-db
+      plan: free

@@ -1,5 +1,5 @@
-// API client for frontend to communicate with backend
-// Uses relative URLs - works with Next.js rewrites in dev and same-origin in production
+// API client for frontend to communicate with backend.
+// API_URL must be provided at build time.
 
 import type {
   House,
@@ -27,8 +27,13 @@ import type {
   OperatingCost,
 } from "@/types";
 
-// Use empty string for relative URLs - works with Next.js rewrites and same-origin production
-const BASE = "";
+const API_URL = process.env.API_URL;
+
+if (!API_URL) {
+  throw new Error("API_URL must be set");
+}
+
+const BASE = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
 
 // ============================================
 // Auth Helpers

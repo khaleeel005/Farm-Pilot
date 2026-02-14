@@ -258,6 +258,26 @@ The application uses **JWT-based authentication** with HTTP-only cookies:
 - **Houses**: Manage chicken houses
 - **Daily Logs**: Record production data
 - **Sales**: Track egg sales
+
+## 🚀 Deployment
+
+### Backend (Render)
+
+1. Push this repo with `render.yaml` to GitHub.
+2. In Render, create a **Blueprint** from the repo.
+3. Set required manual env vars for the backend service:
+   - `FRONTEND_URL` (your Vercel domain, comma-separated if multiple)
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD`
+   - `ADMIN_NAME`
+4. Deploy and confirm health check: `https://<render-backend>/api/health`.
+
+### Frontend (Vercel)
+
+1. Import the same repo in Vercel.
+2. Use root project settings (the repo includes `vercel.json`).
+3. Set `API_URL` in Vercel env vars to your Render backend origin (for example, `https://<render-backend>`).
+4. Deploy and verify the app loads and API calls succeed.
 - **Feed**: Manage feed recipes and batches
 - **Labor**: Track workers and payroll
 - **Staff**: User management

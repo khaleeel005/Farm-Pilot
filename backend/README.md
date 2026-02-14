@@ -70,6 +70,17 @@ Start the production server:
 pnpm start
 ```
 
+## Render Deployment
+
+This repo includes `../render.yaml` for Render Blueprint deployment.
+
+Manual env vars you must set in Render:
+
+- `FRONTEND_URL`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `ADMIN_NAME`
+
 ## Scripts
 
 - `pnpm dev` - Start development server with tsx watch

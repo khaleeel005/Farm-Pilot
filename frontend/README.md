@@ -28,6 +28,14 @@ Build the app for production:
 pnpm run build
 ```
 
+## Vercel Deployment
+
+Deploy from the monorepo root. This repo includes `../vercel.json`.
+
+Required Vercel environment variable:
+
+- `API_URL` = your Render backend origin (for example, `https://<render-backend>`)
+
 Preview the production build locally:
 
 ```bash
