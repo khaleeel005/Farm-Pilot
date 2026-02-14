@@ -25,7 +25,7 @@
     "frontend"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x"
   },
   "packageManager": "pnpm@10.12.2",
   "devDependencies": {
