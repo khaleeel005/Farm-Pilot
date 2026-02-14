@@ -3,6 +3,9 @@ services:
       runtime: node
       name: farm-pilot-api
       rootDir: backend
+      buildFilter:
+          paths:
+              - backend/**
       plan: free
       autoDeploy: true
       healthCheckPath: /api/health
