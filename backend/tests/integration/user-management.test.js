@@ -1,7 +1,7 @@
 import request from "supertest";
 import { sequelize, autoMigrate } from "../../dist/utils/database.js";
 import app from "../../testApp.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 describe("Authentication Flow", () => {
   let ownerToken;

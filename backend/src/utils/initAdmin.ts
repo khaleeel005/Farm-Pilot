@@ -1,5 +1,5 @@
 import { sequelize } from './database.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import logger from '../config/logger.js';
 import { asEntity } from './modelHelpers.js';

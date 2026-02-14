@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import { ROLES } from "../config/roles.js";
 import { BadRequestError, NotFoundError } from "../utils/exceptions.js";

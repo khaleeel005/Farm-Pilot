@@ -1,7 +1,7 @@
 import request from "supertest";
 import app from "../../../testApp.js";
 import { autoMigrate, sequelize } from "../../../dist/utils/database.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 describe("POST /api/feed/batches/estimate", () => {
   let ownerToken;

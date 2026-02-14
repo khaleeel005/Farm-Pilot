@@ -182,6 +182,6 @@ backend/
 
 ## Notes
 
-- Native modules (`bcrypt`, `sqlite3`) may require build approval with pnpm
+- Native modules (`sqlite3`) may require build approval with pnpm
 - The server uses `tsx` for development (no build step needed)
 - Production uses compiled JavaScript from the `dist/` directory

@@ -12,7 +12,7 @@ beforeAll(async () => {
   await autoMigrate();
   // create an admin user directly for tests
   const { default: User } = await import("../../dist/models/User.js");
-  const bcrypt = await import("bcrypt");
+  const bcrypt = await import("bcryptjs");
   const hash = await bcrypt.hash("admin123", 10);
   await User.create({ username: "admin", password: hash, role: "owner" });
 });
