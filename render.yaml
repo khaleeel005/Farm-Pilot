@@ -1,7 +1,7 @@
 services:
     - type: web
+      runtime: node
       name: farm-pilot-api
-      env: node
       rootDir: backend
       plan: free
       autoDeploy: true
