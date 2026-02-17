@@ -34,12 +34,9 @@ import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 import {
   Receipt,
   Plus,
-  Filter,
   Download,
   CheckCircle,
-  Clock,
   AlertCircle,
-  XCircle,
 } from "lucide-react";
 import { getCostTypes, getCostEntries, createCostEntry } from "@/lib/api";
 import formatCurrency from "@/lib/format";
@@ -55,6 +52,10 @@ export function ExpenseManagement({
   userRole = "owner",
 }: ExpenseManagementProps) {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<
+    "all" | "operational" | "capital" | "emergency"
+  >("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
   const [costTypes, setCostTypes] = useState<CostTypeOption[]>([]);
@@ -166,51 +167,117 @@ export function ExpenseManagement({
     loadCostData();
   }, [loadCostData]);
 
-  const mockExpenses = costEntries.map((entry) => ({
+  const filteredExpenses = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return costEntries.filter((entry) => {
+      const matchesCategory =
+        categoryFilter === "all" || entry.category === categoryFilter;
+      const searchHaystack = [
+        entry.description,
+        entry.costType,
+        entry.vendor,
+        entry.creator?.username,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const matchesSearch = !term || searchHaystack.includes(term);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [costEntries, categoryFilter, searchTerm]);
+
+  const expenses = filteredExpenses.map((entry) => ({
     id: entry.id,
     date: entry.date,
     category: entry.category || entry.costType,
     description: entry.description,
     amount: entry.amount,
-    status: "recorded",
+    status:
+      entry.receiptNumber && entry.vendor
+        ? "verified"
+        : entry.receiptNumber || entry.vendor || entry.notes
+          ? "documented"
+          : "recorded",
     submittedBy: entry.creator?.username || "Unknown",
     receipt: entry.receiptNumber || null,
+    vendor: entry.vendor || null,
   }));
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "approved":
+      case "verified":
         return (
           <Badge className="border-transparent bg-success text-success-foreground">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Approved
+            Verified
           </Badge>
         );
-      case "pending":
+      case "documented":
         return (
           <Badge variant="secondary">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Rejected
+            Documented
           </Badge>
         );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">Recorded</Badge>;
     }
   };
 
-  const totalExpenses = costEntries.reduce(
+  const totalExpenses = filteredExpenses.reduce(
     (s, e) => s + (Number(e.amount) || 0),
     0,
   );
-  const pendingExpenses = 0;
-  const approvedExpenses = costEntries.length;
+  const verifiedExpenses = expenses.filter((e) => e.status === "verified").length;
+  const documentedExpenses = expenses.filter(
+    (e) => e.status === "documented",
+  ).length;
+  const exportedRows = expenses.length;
+
+  const handleExport = () => {
+    if (expenses.length === 0) {
+      toast.error("No expenses available to export.");
+      return;
+    }
+
+    const headers = [
+      "Date",
+      "Category",
+      "Description",
+      "Amount",
+      "Submitted By",
+      "Status",
+      "Receipt Number",
+      "Vendor",
+    ];
+
+    const csvRows = expenses.map((expense) =>
+      [
+        expense.date,
+        expense.category,
+        expense.description,
+        Number(expense.amount || 0).toFixed(2),
+        expense.submittedBy,
+        expense.status,
+        expense.receipt || "",
+        expense.vendor || "",
+      ]
+        .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+        .join(","),
+    );
+
+    const csv = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `expenses-${currentMonthRange.startDate}-to-${currentMonthRange.endDate}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Expense export downloaded.");
+  };
 
   return (
     <div className="space-y-6">
@@ -228,8 +295,8 @@ export function ExpenseManagement({
             title={userRole === "staff" ? "Log Expenses" : "Expense Management"}
             description={
               userRole === "staff"
-                ? "Record and submit farm expenses for approval"
-                : "Track, approve, and manage all farm expenses"
+                ? "Record and track farm expenses"
+                : "Track and manage all farm expenses"
             }
             actions={
               <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
@@ -253,7 +320,7 @@ export function ExpenseManagement({
                       Step 1
                     </p>
                     <h3 className="display-heading text-2xl">Expense Details</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="grid gap-2">
                         <Label htmlFor="date">Date</Label>
                         <Input
@@ -345,7 +412,7 @@ export function ExpenseManagement({
                       Step 2
                     </p>
                     <h3 className="display-heading text-2xl">Optional Metadata</h3>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="grid gap-2">
                         <Label htmlFor="vendor">Vendor (optional)</Label>
                         <Input
@@ -418,31 +485,33 @@ export function ExpenseManagement({
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">
-                      Pending Approval
+                      Verified
                     </CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                    <CheckCircle className="h-4 w-4 text-muted-foreground hidden sm:block" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-lg sm:text-2xl font-bold">
-                      {pendingExpenses}
+                      {verifiedExpenses}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Awaiting review
+                      Includes receipt + vendor
                     </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium">
-                      Approved
+                      Documented
                     </CardTitle>
                     <CheckCircle className="h-4 w-4 text-muted-foreground hidden sm:block" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-lg sm:text-2xl font-bold">
-                      {approvedExpenses}
+                      {documentedExpenses}
                     </div>
-                    <p className="text-xs text-muted-foreground">This month</p>
+                    <p className="text-xs text-muted-foreground">
+                      Vendor, note, or receipt attached
+                    </p>
                   </CardContent>
                 </Card>
               </>
@@ -482,18 +551,38 @@ export function ExpenseManagement({
                   </CardTitle>
                   <CardDescription>
                     {userRole === "staff"
-                      ? "Your submitted expenses and their status"
-                      : "All farm expenses requiring review and approval"}
+                      ? "Your submitted expenses and their documentation quality"
+                      : "All farm expenses with searchable records"}
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                  </Button>
-                  <Button variant="outline" size="sm">
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={categoryFilter}
+                    onChange={(e) =>
+                      setCategoryFilter(
+                        e.target.value as
+                          | "all"
+                          | "operational"
+                          | "capital"
+                          | "emergency",
+                      )
+                    }
+                  >
+                    <option value="all">All categories</option>
+                    <option value="operational">Operational</option>
+                    <option value="capital">Capital</option>
+                    <option value="emergency">Emergency</option>
+                  </select>
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search description, type, vendor..."
+                    className="h-9 w-full sm:w-[260px]"
+                  />
+                  <Button variant="outline" size="sm" onClick={handleExport}>
                     <Download className="h-4 w-4 mr-2" />
-                    Export
+                    Export CSV ({exportedRows})
                   </Button>
                 </div>
               </div>
@@ -514,8 +603,8 @@ export function ExpenseManagement({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockExpenses.map((expense) => (
-                    <TableRow key={expense.id}>
+                  {expenses.map((expense) => (
+                    <TableRow key={expense.id || `${expense.date}-${expense.description}`}>
                       <TableCell>
                         {format(new Date(expense.date), "MMM dd, yyyy")}
                       </TableCell>
@@ -531,32 +620,13 @@ export function ExpenseManagement({
                       )}
                       <TableCell>{getStatusBadge(expense.status)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          {expense.receipt && (
-                            <Button variant="ghost" size="sm">
-                              View Receipt
-                            </Button>
-                          )}
-                          {userRole === "owner" &&
-                            expense.status === "pending" && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-green-600"
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600"
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
-                        </div>
+                        {expense.receipt ? (
+                          <span className="text-xs text-muted-foreground">
+                            Receipt #{expense.receipt}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

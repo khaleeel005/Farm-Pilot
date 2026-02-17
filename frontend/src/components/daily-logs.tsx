@@ -40,6 +40,7 @@ import { Calendar as CalendarIcon, Trash2, Edit, RefreshCw, ChevronLeft, Chevron
 import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import { PageHeader } from '@/components/shared/page-header';
 import { useResourcePermissions, useToastContext } from '@/hooks';
 import { DailyLog, DailyLogPayload, House, FeedBatch } from '@/types';
 import { cn } from '@/lib/utils';
@@ -198,6 +199,47 @@ export function DailyLogs() {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-[200px] justify-start text-left font-normal',
+              !selectedDate && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {format(selectedDate, 'PPP')}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleDateChange}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      <Button variant="outline" size="icon" onClick={goToNextDay}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      {!isToday && (
+        <Button variant="outline" size="sm" onClick={goToToday}>
+          Today
+        </Button>
+      )}
+      <Button variant="outline" size="icon" onClick={loadLogs} disabled={loading}>
+        <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Delete Confirmation Dialog */}
@@ -316,55 +358,24 @@ export function DailyLogs() {
         </DialogContent>
       </Dialog>
 
+      <PageHeader
+        eyebrow="Production Journal"
+        title="Daily Logs"
+        description={
+          isToday
+            ? "Today's production logs"
+            : `Logs for ${format(selectedDate, 'MMMM d, yyyy')}`
+        }
+        actions={headerActions}
+      />
+
       {/* Main Card */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Daily Logs</CardTitle>
-              <CardDescription>
-                {isToday ? "Today's production logs" : `Logs for ${format(selectedDate, 'MMMM d, yyyy')}`}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={goToPreviousDay}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-[200px] justify-start text-left font-normal',
-                      !selectedDate && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(selectedDate, 'PPP')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="icon" onClick={goToNextDay}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              {!isToday && (
-                <Button variant="outline" size="sm" onClick={goToToday}>
-                  Today
-                </Button>
-              )}
-              <Button variant="outline" size="icon" onClick={loadLogs} disabled={loading}>
-                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-              </Button>
-            </div>
-          </div>
+          <CardTitle className="display-heading text-2xl">Log Entries</CardTitle>
+          <CardDescription>
+            Browse, edit, and validate entries for the selected day.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (

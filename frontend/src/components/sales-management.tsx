@@ -272,7 +272,7 @@ export function SalesManagement() {
                 placeholder="Enter customer name"
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Phone</Label>
                 <Input
@@ -432,7 +432,7 @@ export function SalesManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 xl:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="customer">Customer *</Label>
                   <Select
@@ -478,7 +478,7 @@ export function SalesManagement() {
                   Egg Quantity & Pricing
                 </Label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Quantity (eggs)</Label>
                     <Input
@@ -518,7 +518,7 @@ export function SalesManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 xl:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
                   <Select

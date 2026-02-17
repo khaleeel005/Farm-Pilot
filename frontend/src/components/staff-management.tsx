@@ -123,6 +123,7 @@ export function StaffManagement() {
   const activeStaff = staffMembers.filter(
     (s) => (s.status || "active") === "active",
   ).length;
+  const inactiveStaff = Math.max(totalStaff - activeStaff, 0);
   const perfValues = staffMembers
     .map((s) => s.performance)
     .filter((p) => typeof p === "number") as number[];
@@ -139,6 +140,7 @@ export function StaffManagement() {
     (s, m) => s + parseSalary(m.salary),
     0,
   );
+  const payrollRecords = staffMembers.filter((m) => parseSalary(m.salary) > 0).length;
 
   if (loading) {
     return <LoadingSpinner fullPage message="Loading staff members..." />;
@@ -182,7 +184,7 @@ export function StaffManagement() {
                   Step 1
                 </p>
                 <h3 className="display-heading text-2xl">Account Basics</h3>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
                     <Input
@@ -283,7 +285,9 @@ export function StaffManagement() {
           </CardHeader>
           <CardContent>
             <div className="display-heading text-3xl leading-none">{totalStaff}</div>
-            <p className="text-xs text-muted-foreground">+1 from last month</p>
+            <p className="text-xs text-muted-foreground">
+              {activeStaff} active member{activeStaff !== 1 ? "s" : ""}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -295,7 +299,9 @@ export function StaffManagement() {
           </CardHeader>
           <CardContent>
             <div className="display-heading text-3xl leading-none">{activeStaff}</div>
-            <p className="text-xs text-muted-foreground">1 on leave</p>
+            <p className="text-xs text-muted-foreground">
+              {inactiveStaff} inactive member{inactiveStaff !== 1 ? "s" : ""}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -309,7 +315,11 @@ export function StaffManagement() {
             <div className="display-heading text-3xl leading-none">
               {avgPerformance}%
             </div>
-            <p className="text-xs text-muted-foreground">+5% from last month</p>
+            <p className="text-xs text-muted-foreground">
+              {perfValues.length > 0
+                ? `Based on ${perfValues.length} performance record${perfValues.length !== 1 ? "s" : ""}`
+                : "No performance records yet"}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -323,7 +333,9 @@ export function StaffManagement() {
             <div className="display-heading text-3xl leading-none truncate">
               {formatCurrency(totalPayroll)}
             </div>
-            <p className="text-xs text-muted-foreground">Monthly total</p>
+            <p className="text-xs text-muted-foreground">
+              {payrollRecords} salary record{payrollRecords !== 1 ? "s" : ""}
+            </p>
           </CardContent>
         </Card>
       </div>

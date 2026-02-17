@@ -8,6 +8,7 @@ import { Calendar, TrendingUp, Egg, Package, Clock, Award, Target, BarChart3 } f
 import { getDailyLogs, getWorkAssignments } from "@/lib/api"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { EmptyState } from "@/components/shared/empty-state"
+import { PageHeader } from "@/components/shared/page-header"
 
 interface DailyPerformance {
   day: string;
@@ -168,17 +169,17 @@ export function StaffReports() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-balance">My Performance</h2>
-          <p className="text-muted-foreground">Your work summary and achievements</p>
-        </div>
-        <Badge variant="outline" className="text-sm">
-          <Calendar className="h-4 w-4 mr-1" />
-          This Week
-        </Badge>
-      </div>
+      <PageHeader
+        eyebrow="Productivity"
+        title="My Performance"
+        description="Your work summary, output trends, and weekly achievements"
+        actions={
+          <Badge variant="outline" className="text-sm">
+            <Calendar className="h-4 w-4 mr-1" />
+            This Week
+          </Badge>
+        }
+      />
 
       {/* Weekly Summary */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

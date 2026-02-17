@@ -43,11 +43,13 @@ import {
   getSalesReport,
   getFinancialReport,
   exportReport,
+  getCustomers,
+  getSales,
+} from "@/lib/api";
+import type {
   ProductionReportData,
   SalesReportData,
   FinancialReportData,
-  getCustomers,
-  getSales,
 } from "@/lib/api";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { PageHeader } from "@/components/shared/page-header";
@@ -236,34 +238,69 @@ export function ReportsSection() {
       ? Math.round((netProfit / totalRevenue) * 100 * 10) / 10
       : 0;
 
-  // Group production by week for weekly data
-  const weeklyData = productionData?.logs
-    ? (() => {
-        const weeks: { [key: string]: { production: number; sales: number } } =
-          {};
-        productionData.logs.forEach((log, idx) => {
-          const weekNum = Math.floor(idx / 7) + 1;
-          const weekKey = `Week ${weekNum}`;
-          if (!weeks[weekKey]) weeks[weekKey] = { production: 0, sales: 0 };
-          weeks[weekKey].production += log.eggsCollected || 0;
-        });
+  const { startDate, endDate } = getDateRange();
+  const rangeStart = new Date(startDate);
+  const rangeEnd = new Date(endDate);
+  const totalRangeDays = Math.max(
+    1,
+    Math.floor(
+      (rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24),
+    ) + 1,
+  );
 
-        // Add sales data by week
-        salesData?.rows.forEach((sale, idx) => {
-          const weekNum = Math.floor(idx / 7) + 1;
-          const weekKey = `Week ${weekNum}`;
-          if (!weeks[weekKey]) weeks[weekKey] = { production: 0, sales: 0 };
-          weeks[weekKey].sales += sale.totalAmount || 0;
-        });
+  // Group production/sales by real week index in the selected date range
+  const weekBuckets = new Map<
+    number,
+    { week: string; production: number; sales: number; days: Set<string> }
+  >();
 
-        return Object.entries(weeks).map(([week, data]) => ({
-          week,
-          production: data.production,
-          sales: data.sales,
-          profit: Math.round(data.sales * 0.2), // Estimated profit margin
-        }));
-      })()
-    : [];
+  const getWeekIndex = (isoDate: string) => {
+    const date = new Date(isoDate);
+    const diffDays = Math.floor(
+      (date.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    return Math.max(0, Math.floor(diffDays / 7));
+  };
+
+  productionData?.logs.forEach((log) => {
+    const weekIndex = getWeekIndex(log.logDate);
+    const existing = weekBuckets.get(weekIndex) || {
+      week: `Week ${weekIndex + 1}`,
+      production: 0,
+      sales: 0,
+      days: new Set<string>(),
+    };
+    existing.production += log.eggsCollected || 0;
+    existing.days.add(log.logDate);
+    weekBuckets.set(weekIndex, existing);
+  });
+
+  salesData?.rows.forEach((sale) => {
+    const weekIndex = getWeekIndex(sale.saleDate);
+    const existing = weekBuckets.get(weekIndex) || {
+      week: `Week ${weekIndex + 1}`,
+      production: 0,
+      sales: 0,
+      days: new Set<string>(),
+    };
+    existing.sales += sale.totalAmount || 0;
+    existing.days.add(sale.saleDate);
+    weekBuckets.set(weekIndex, existing);
+  });
+
+  const dailyOperatingCost = totalOperatingCosts / totalRangeDays;
+  const weeklyData = Array.from(weekBuckets.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, data]) => {
+      const activeDays = Math.max(1, data.days.size);
+      const allocatedCost = dailyOperatingCost * activeDays;
+      return {
+        week: data.week,
+        production: data.production,
+        sales: data.sales,
+        profit: Math.round(data.sales - allocatedCost),
+      };
+    });
 
   if (loading) {
     return <LoadingSpinner fullPage message="Loading reports..." />;
@@ -313,7 +350,7 @@ export function ReportsSection() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
               <Label>Date Range</Label>
               <Select value={dateRange} onValueChange={setDateRange}>
@@ -377,7 +414,7 @@ export function ReportsSection() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium">
@@ -481,7 +518,7 @@ export function ReportsSection() {
 
         {/* Production Tab */}
         <TabsContent value="production" className="space-y-6">
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium">
@@ -576,7 +613,7 @@ export function ReportsSection() {
 
         {/* Sales Tab */}
         <TabsContent value="sales" className="space-y-6">
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium">
@@ -701,7 +738,7 @@ export function ReportsSection() {
 
         {/* Financial Tab */}
         <TabsContent value="financial" className="space-y-6">
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium">
@@ -815,7 +852,7 @@ export function ReportsSection() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Button
                 variant="outline"
                 className="justify-start bg-transparent text-xs sm:text-sm"
