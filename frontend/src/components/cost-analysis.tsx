@@ -17,9 +17,11 @@ import {
   Calculator,
   Target,
   AlertCircle,
-  Loader2,
 } from "lucide-react";
 import { getEggPriceEstimate, getSales } from "@/lib/api";
+import { PageHeader } from "@/components/shared/page-header";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { ErrorState } from "@/components/shared/error-state";
 
 interface CostBreakdown {
   feedCost: number;
@@ -149,37 +151,26 @@ export function CostAnalysis() {
       : 0;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner fullPage message="Loading cost analysis..." />;
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <p className="text-muted-foreground">{error}</p>
-        <button onClick={loadCostData} className="text-primary hover:underline">
-          Try again
-        </button>
-      </div>
+      <ErrorState title="Failed to load analysis" message={error} onRetry={loadCostData} />
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold text-balance">Cost Analysis</h2>
-        <p className="text-muted-foreground">
-          Real-time cost calculations and pricing recommendations
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Financial Intelligence"
+        title="Cost Analysis"
+        description="Real-time cost calculations and pricing recommendations"
+      />
 
       {/* Cost Overview */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -188,7 +179,7 @@ export function CostAnalysis() {
             <Calculator className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {costBreakdown.total > 0
                 ? `₦${costBreakdown.total.toFixed(2)}`
                 : "N/A"}
@@ -215,7 +206,7 @@ export function CostAnalysis() {
           </CardHeader>
           <CardContent>
             <div
-              className={`text-xl sm:text-2xl font-bold ${profitPerEgg > 0 ? "text-chart-5" : "text-destructive"}`}
+              className={`display-heading text-3xl leading-none ${profitPerEgg > 0 ? "text-chart-5" : "text-destructive"}`}
             >
               {profitPerEgg !== 0 ? `₦${profitPerEgg.toFixed(2)}` : "N/A"}
             </div>
@@ -241,7 +232,7 @@ export function CostAnalysis() {
           </CardHeader>
           <CardContent>
             <div
-              className={`text-2xl font-bold ${monthlyProjection.monthlyProfit > 0 ? "text-chart-5" : ""}`}
+              className={`display-heading text-3xl leading-none ${monthlyProjection.monthlyProfit > 0 ? "text-chart-5" : ""}`}
             >
               {monthlyProjection.monthlyProfit !== 0
                 ? `₦${monthlyProjection.monthlyProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
@@ -261,7 +252,7 @@ export function CostAnalysis() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {profitMargin !== 0 ? `${profitMargin.toFixed(1)}%` : "N/A"}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -279,7 +270,9 @@ export function CostAnalysis() {
         {/* Cost Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>Cost Breakdown per Egg</CardTitle>
+            <CardTitle className="display-heading text-2xl">
+              Cost Breakdown per Egg
+            </CardTitle>
             <CardDescription>
               Detailed analysis of production costs
             </CardDescription>
@@ -391,9 +384,9 @@ export function CostAnalysis() {
 
                 <Separator />
 
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/45 p-3">
                   <div className="font-medium">Total Cost per Egg</div>
-                  <div className="text-xl font-bold">
+                  <div className="display-heading text-3xl leading-none">
                     ₦{costBreakdown.total.toFixed(2)}
                   </div>
                 </div>
@@ -412,7 +405,9 @@ export function CostAnalysis() {
         {/* Pricing Recommendations */}
         <Card>
           <CardHeader>
-            <CardTitle>Pricing Recommendation</CardTitle>
+            <CardTitle className="display-heading text-2xl">
+              Pricing Recommendation
+            </CardTitle>
             <CardDescription>
               Suggested price based on cost + margin
             </CardDescription>
@@ -514,7 +509,9 @@ export function CostAnalysis() {
       {/* Profitability Analysis */}
       <Card>
         <CardHeader>
-          <CardTitle>Profitability Analysis</CardTitle>
+          <CardTitle className="display-heading text-2xl">
+            Profitability Analysis
+          </CardTitle>
           <CardDescription>Current performance and projections</CardDescription>
         </CardHeader>
         <CardContent>

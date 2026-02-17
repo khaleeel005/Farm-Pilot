@@ -45,6 +45,7 @@ import { getCostTypes, getCostEntries, createCostEntry } from "@/lib/api";
 import formatCurrency from "@/lib/format";
 import type { CostEntry, CostTypeOption } from "@/types/entities/cost";
 import { useToastContext } from "@/hooks";
+import { PageHeader } from "@/components/shared/page-header";
 
 interface ExpenseManagementProps {
   userRole?: "owner" | "staff";
@@ -222,25 +223,23 @@ export function ExpenseManagement({
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-balance">
-                {userRole === "staff" ? "Log Expenses" : "Expense Management"}
-              </h2>
-              <p className="text-muted-foreground">
-                {userRole === "staff"
-                  ? "Record and submit farm expenses for approval"
-                  : "Track, approve, and manage all farm expenses"}
-              </p>
-            </div>
-            <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+          <PageHeader
+            eyebrow="Cost Ledger"
+            title={userRole === "staff" ? "Log Expenses" : "Expense Management"}
+            description={
+              userRole === "staff"
+                ? "Record and submit farm expenses for approval"
+                : "Track, approve, and manage all farm expenses"
+            }
+            actions={
+              <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Operating Cost
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-h-[85vh] sm:max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Add Expense</DialogTitle>
                   <DialogDescription>
@@ -248,122 +247,132 @@ export function ExpenseManagement({
                     description).
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={newCostEntry.date || ""}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          date: e.target.value,
-                        }))
-                      }
-                    />
+                <div className="space-y-5 py-2">
+                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                      Step 1
+                    </p>
+                    <h3 className="display-heading text-2xl">Expense Details</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={newCostEntry.date || ""}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              date: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="costType">Cost Type</Label>
+                        <select
+                          id="costType"
+                          className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
+                          value={newCostEntry.costType || ""}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              costType: e.target
+                                .value as unknown as CostEntry["costType"],
+                            }))
+                          }
+                        >
+                          <option value="">Select cost type</option>
+                          {costTypes.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid gap-2 sm:col-span-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Input
+                          id="description"
+                          value={newCostEntry.description || ""}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              description: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="amount">Amount (₦)</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={newCostEntry.amount || 0}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              amount: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="category">Category</Label>
+                        <select
+                          id="category"
+                          className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
+                          value={newCostEntry.category || "operational"}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              category: e.target.value as
+                                | "operational"
+                                | "capital"
+                                | "emergency",
+                            }))
+                          }
+                        >
+                          <option value="operational">Operational</option>
+                          <option value="capital">Capital</option>
+                          <option value="emergency">Emergency</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="costType">Cost Type</Label>
-                    <select
-                      id="costType"
-                      className="border rounded px-2 py-1"
-                      value={newCostEntry.costType || ""}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          costType: e.target
-                            .value as unknown as CostEntry["costType"],
-                        }))
-                      }
-                    >
-                      <option value="">Select cost type</option>
-                      {costTypes.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Input
-                      id="description"
-                      value={newCostEntry.description || ""}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="amount">Amount (₦)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      value={newCostEntry.amount || 0}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          amount: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="category">Category</Label>
-                    <select
-                      id="category"
-                      className="border rounded px-2 py-1"
-                      value={newCostEntry.category || "operational"}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          category: e.target.value as
-                            | "operational"
-                            | "capital"
-                            | "emergency",
-                        }))
-                      }
-                    >
-                      <option value="operational">Operational</option>
-                      <option value="capital">Capital</option>
-                      <option value="emergency">Emergency</option>
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="vendor">Vendor (optional)</Label>
-                    <Input
-                      id="vendor"
-                      value={newCostEntry.vendor || ""}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          vendor: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="notes">Notes (optional)</Label>
-                    <Input
-                      id="notes"
-                      value={newCostEntry.notes || ""}
-                      onChange={(e) =>
-                        setNewCostEntry((prev) => ({
-                          ...prev,
-                          notes: e.target.value,
-                        }))
-                      }
-                    />
+                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                      Step 2
+                    </p>
+                    <h3 className="display-heading text-2xl">Optional Metadata</h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="vendor">Vendor (optional)</Label>
+                        <Input
+                          id="vendor"
+                          value={newCostEntry.vendor || ""}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              vendor: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="notes">Notes (optional)</Label>
+                        <Input
+                          id="notes"
+                          value={newCostEntry.notes || ""}
+                          onChange={(e) =>
+                            setNewCostEntry((prev) => ({
+                              ...prev,
+                              notes: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <DialogFooter>
@@ -378,11 +387,12 @@ export function ExpenseManagement({
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
-          </div>
+              </Dialog>
+            }
+          />
 
           {/* Stats Cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium">
@@ -467,7 +477,9 @@ export function ExpenseManagement({
             <CardHeader>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <CardTitle>Recent Expenses</CardTitle>
+                  <CardTitle className="display-heading text-2xl">
+                    Recent Expenses
+                  </CardTitle>
                   <CardDescription>
                     {userRole === "staff"
                       ? "Your submitted expenses and their status"

@@ -77,17 +77,17 @@ export function ErrorState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-12 px-4 text-center",
+        "flex flex-col items-center justify-center rounded-2xl border border-border/80 bg-card/45 px-4 py-12 text-center",
         className
       )}
     >
-      <div className={cn("rounded-full bg-muted p-4 mb-4", config.iconColor)}>
+      <div className={cn("mb-4 rounded-2xl bg-muted/70 p-4", config.iconColor)}>
         <Icon className="h-8 w-8" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-1">{displayTitle}</h3>
-      <p className="text-sm text-muted-foreground max-w-sm mb-4">{displayMessage}</p>
+      <h3 className="display-heading mb-1 text-2xl text-foreground">{displayTitle}</h3>
+      <p className="mb-4 max-w-sm text-sm text-muted-foreground">{displayMessage}</p>
       {onRetry && (
-        <Button onClick={onRetry} disabled={retrying} variant="outline">
+        <Button onClick={onRetry} disabled={retrying} variant="outline" className="rounded-xl">
           <RefreshCw className={cn("h-4 w-4 mr-2", retrying && "animate-spin")} />
           {retrying ? "Retrying..." : "Try again"}
         </Button>

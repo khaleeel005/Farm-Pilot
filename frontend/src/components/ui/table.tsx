@@ -8,12 +8,12 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0"
+      className="relative -mx-4 w-full overflow-x-auto px-4 sm:mx-0 sm:rounded-xl sm:border sm:border-border/70 sm:bg-background/50 sm:px-0"
     >
       <table
         data-slot="table"
         className={cn(
-          "w-full caption-bottom text-sm min-w-[500px] sm:min-w-0",
+          "w-full min-w-[500px] caption-bottom text-sm sm:min-w-0",
           className,
         )}
         {...props}
@@ -26,7 +26,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("bg-muted/45 [&_tr]:border-b [&_tr]:border-border/70", className)}
       {...props}
     />
   );
@@ -60,7 +60,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
+        "border-b border-border/65 transition-colors hover:bg-muted/35 data-[state=selected]:bg-muted/55",
         className,
       )}
       {...props}
@@ -73,7 +73,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "text-foreground h-10 px-2 sm:px-3 text-left align-middle font-medium text-xs sm:text-sm [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "text-foreground h-10 px-2 text-left align-middle text-xs font-semibold uppercase tracking-[0.12em] sm:px-3 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className,
       )}
       {...props}
@@ -86,7 +86,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 sm:p-3 align-middle text-xs sm:text-sm [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "p-2 align-middle text-xs sm:p-3 sm:text-sm [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className,
       )}
       {...props}

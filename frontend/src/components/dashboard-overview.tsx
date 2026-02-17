@@ -17,7 +17,15 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Egg, DollarSign, TrendingUp, TrendingDown, Users } from "lucide-react";
+import {
+  Egg,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  ArrowUpRight,
+  Activity,
+} from "lucide-react";
 import { House } from "@/types";
 import { CardGridSkeleton } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
@@ -256,6 +264,15 @@ export function DashboardOverview() {
     return isNaN(num) ? 0 : num;
   };
 
+  const maxWeeklyEggs = Math.max(
+    1,
+    ...weeklyData.map((day) => safeNumber(day.eggs)),
+  );
+  const maxWeeklySales = Math.max(
+    1,
+    ...weeklyData.map((day) => safeNumber(day.sales)),
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -284,6 +301,7 @@ export function DashboardOverview() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Farm Activity"
         title="Dashboard Overview"
         description={`Today: ${new Date().toLocaleDateString("en-US", {
           weekday: "long",
@@ -294,20 +312,22 @@ export function DashboardOverview() {
       />
 
       {/* Key Metrics */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
+            <CardTitle className="text-sm font-medium">
               Eggs Collected
             </CardTitle>
-            <Egg className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            <div className="rounded-lg bg-primary/10 p-2">
+              <Egg className="h-4 w-4 text-primary" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl">
               {safeNumber(todayStats.eggsCollected)}
             </div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="mr-1 h-3 w-3 text-chart-5" />+
+            <div className="mt-2 flex items-center text-xs text-muted-foreground">
+              <TrendingUp className="mr-1 h-3 w-3 text-primary" />+
               {calculatePercentageChange(
                 safeNumber(todayStats.eggsCollected),
                 safeNumber(todayStats.eggsYesterday),
@@ -317,19 +337,21 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
+            <CardTitle className="text-sm font-medium">
               Sales Revenue
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            <div className="rounded-lg bg-chart-2/15 p-2">
+              <DollarSign className="h-4 w-4 text-chart-2" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl">
               ₦{safeNumber(todayStats.salesAmount).toLocaleString()}
             </div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="mr-1 h-3 w-3 text-chart-5" />+
+            <div className="mt-2 flex items-center text-xs text-muted-foreground">
+              <TrendingUp className="mr-1 h-3 w-3 text-primary" />+
               {calculatePercentageChange(
                 safeNumber(todayStats.salesAmount),
                 safeNumber(todayStats.salesYesterday),
@@ -339,18 +361,20 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
+            <CardTitle className="text-sm font-medium">
               Cost per Egg
             </CardTitle>
-            <TrendingDown className="h-4 w-4 text-chart-5 hidden sm:block" />
+            <div className="rounded-lg bg-chart-5/15 p-2">
+              <TrendingDown className="h-4 w-4 text-chart-5" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl">
               ₦{safeNumber(todayStats.costPerEgg)}
             </div>
-            <div className="flex items-center text-xs text-muted-foreground">
+            <div className="mt-2 flex items-center text-xs text-muted-foreground">
               <TrendingDown className="mr-1 h-3 w-3 text-chart-5" />-
               {calculatePercentageChange(
                 safeNumber(todayStats.costYesterday),
@@ -361,15 +385,17 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
+            <CardTitle className="text-sm font-medium">
               Active Workers
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            <div className="rounded-lg bg-info/15 p-2">
+              <Users className="h-4 w-4 text-info" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl">
               {safeNumber(todayStats.activeWorkers)}/
               {safeNumber(todayStats.totalWorkers)}
             </div>
@@ -379,7 +405,7 @@ export function DashboardOverview() {
                   (safeNumber(todayStats.totalWorkers) || 1)) *
                 100
               }
-              className="mt-2"
+              className="mt-3 h-2"
             />
           </CardContent>
         </Card>
@@ -387,12 +413,13 @@ export function DashboardOverview() {
 
       {/* Production Trend */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Activity className="h-4 w-4 text-primary" />
               Weekly Production Trend
             </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+            <CardDescription className="text-sm">
               Egg collection over the past 7 days
             </CardDescription>
           </CardHeader>
@@ -401,20 +428,24 @@ export function DashboardOverview() {
               {weeklyData.map((day) => (
                 <div
                   key={day.day}
-                  className="flex items-center justify-between gap-2"
+                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-8 text-xs sm:text-sm font-medium flex-shrink-0">
+                    <div className="w-8 shrink-0 text-sm font-medium">
                       {day.day}
                     </div>
                     <div className="flex-1 min-w-0">
                       <Progress
-                        value={day.eggs > 0 ? (day.eggs / 450) * 100 : 0}
+                        value={
+                          safeNumber(day.eggs) > 0
+                            ? (safeNumber(day.eggs) / maxWeeklyEggs) * 100
+                            : 0
+                        }
                         className="h-2"
                       />
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm font-medium w-10 sm:w-12 text-right flex-shrink-0">
+                  <div className="w-12 shrink-0 text-right text-sm font-medium">
                     {day.eggs > 0 ? day.eggs : "-"}
                   </div>
                 </div>
@@ -423,12 +454,13 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-border/70 bg-card/80 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ArrowUpRight className="h-4 w-4 text-chart-2" />
               Weekly Sales Trend
             </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">
+            <CardDescription className="text-sm">
               Sales revenue over the past 7 days
             </CardDescription>
           </CardHeader>
@@ -437,24 +469,24 @@ export function DashboardOverview() {
               {weeklyData.map((day) => (
                 <div
                   key={`sales-${day.day}`}
-                  className="flex items-center justify-between gap-2"
+                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/40"
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-8 text-xs sm:text-sm font-medium flex-shrink-0">
+                    <div className="w-8 shrink-0 text-sm font-medium">
                       {day.day}
                     </div>
                     <div className="flex-1 min-w-0">
                       <Progress
                         value={
-                          day.sales > 0
-                            ? Math.min((day.sales / 50000) * 100, 100)
+                          safeNumber(day.sales) > 0
+                            ? Math.min((safeNumber(day.sales) / maxWeeklySales) * 100, 100)
                             : 0
                         }
                         className="h-2"
                       />
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm font-medium w-16 sm:w-20 text-right flex-shrink-0 truncate">
+                  <div className="w-24 shrink-0 truncate text-right text-sm font-medium">
                     {day.sales > 0 ? `₦${day.sales.toLocaleString()}` : "-"}
                   </div>
                 </div>
@@ -465,12 +497,12 @@ export function DashboardOverview() {
       </div>
 
       {/* House Performance */}
-      <Card>
+      <Card className="border-border/70 bg-card/80 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base sm:text-lg">
+          <CardTitle className="text-lg">
             House Performance Today
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">
+          <CardDescription className="text-sm">
             Production breakdown by house/coop
           </CardDescription>
         </CardHeader>
@@ -478,9 +510,12 @@ export function DashboardOverview() {
           {housePerformance.length > 0 ? (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {housePerformance.map((house) => (
-                <div key={house.id} className="space-y-2 p-3 border rounded-lg">
+                <div
+                  key={house.id}
+                  className="space-y-3 rounded-xl border border-border/70 bg-background/55 p-4"
+                >
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-sm sm:text-base truncate mr-2">
+                    <h4 className="truncate pr-2 text-base font-medium">
                       {house.name}
                     </h4>
                     <Badge
@@ -491,12 +526,12 @@ export function DashboardOverview() {
                             ? "secondary"
                             : "destructive"
                       }
-                      className="flex-shrink-0"
+                      className="shrink-0"
                     >
                       {house.efficiency}%
                     </Badge>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold">
+                  <div className="display-heading text-3xl">
                     {house.eggs} eggs
                   </div>
                   <Progress value={house.efficiency} className="h-2" />

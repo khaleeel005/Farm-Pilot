@@ -248,6 +248,7 @@ export function SalesManagement() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Revenue Desk"
         title="Sales Management"
         description="Track sales, manage customers, and monitor payments"
         actions={headerActions}
@@ -255,13 +256,13 @@ export function SalesManagement() {
 
       {/* New Customer Dialog */}
       <Dialog open={showNewCustomer} onOpenChange={setShowNewCustomer}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Customer</DialogTitle>
             <DialogDescription>Create a new customer record</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="space-y-5">
+            <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
               <Label>Customer Name *</Label>
               <Input
                 value={customerForm.name}
@@ -271,7 +272,7 @@ export function SalesManagement() {
                 placeholder="Enter customer name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Phone</Label>
                 <Input
@@ -306,32 +307,34 @@ export function SalesManagement() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={customerForm.email}
-                onChange={(e) =>
-                  setCustomerForm((prev) => ({
-                    ...prev,
-                    email: e.target.value,
-                  }))
-                }
-                placeholder="email@example.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input
-                value={customerForm.address}
-                onChange={(e) =>
-                  setCustomerForm((prev) => ({
-                    ...prev,
-                    address: e.target.value,
-                  }))
-                }
-                placeholder="Customer address"
-              />
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={customerForm.email}
+                  onChange={(e) =>
+                    setCustomerForm((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
+                  placeholder="email@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input
+                  value={customerForm.address}
+                  onChange={(e) =>
+                    setCustomerForm((prev) => ({
+                      ...prev,
+                      address: e.target.value,
+                    }))
+                  }
+                  placeholder="Customer address"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -346,7 +349,7 @@ export function SalesManagement() {
       </Dialog>
 
       {/* Sales Overview */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -421,15 +424,15 @@ export function SalesManagement() {
         {showNewSale && (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="text-base sm:text-lg">
+              <CardTitle className="display-heading text-2xl">
                 New Sale Entry
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
+              <CardDescription className="text-sm">
                 Record a new sale transaction
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="customer">Customer *</Label>
                   <Select
@@ -468,9 +471,9 @@ export function SalesManagement() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="opacity-60" />
 
-              <div className="space-y-4">
+              <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
                 <Label className="text-sm sm:text-base font-medium">
                   Egg Quantity & Pricing
                 </Label>
@@ -507,15 +510,15 @@ export function SalesManagement() {
                 </div>
 
                 {/* Total Display */}
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/45 p-3">
                   <span className="font-medium">Total Amount:</span>
-                  <span className="text-xl font-bold">
+                  <span className="display-heading text-3xl leading-none">
                     ₦{calculateTotal().toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
                   <Select
@@ -578,7 +581,9 @@ export function SalesManagement() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recent Sales</CardTitle>
+                <CardTitle className="display-heading text-2xl">
+                  Recent Sales
+                </CardTitle>
                 <CardDescription>Latest sales transactions</CardDescription>
               </div>
             </div>
@@ -650,7 +655,9 @@ export function SalesManagement() {
       {/* Customer Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Customer Management</CardTitle>
+          <CardTitle className="display-heading text-2xl">
+            Customer Management
+          </CardTitle>
           <CardDescription>Manage your customer database</CardDescription>
         </CardHeader>
         <CardContent>
@@ -659,7 +666,7 @@ export function SalesManagement() {
               {customers.map((customer) => (
                 <div
                   key={customer.id}
-                  className="p-3 sm:p-4 border rounded-lg space-y-2"
+                  className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="font-medium text-sm sm:text-base truncate">

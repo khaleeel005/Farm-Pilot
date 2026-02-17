@@ -36,7 +36,9 @@ export function LoadingSpinner({
 }: LoadingSpinnerProps) {
   const content = (
     <div className={cn("flex flex-col items-center justify-center gap-3", className)}>
-      <Loader2 className={cn("animate-spin text-primary", sizeClasses[size])} />
+      <div className="rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm">
+        <Loader2 className={cn("animate-spin text-primary", sizeClasses[size])} />
+      </div>
       {message && (
         <p className={cn("text-muted-foreground", textSizeClasses[size])}>{message}</p>
       )}
@@ -45,7 +47,7 @@ export function LoadingSpinner({
 
   if (fullPage) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] w-full">
+      <div className="flex min-h-[400px] w-full items-center justify-center rounded-2xl border border-border/70 bg-card/50">
         {content}
       </div>
     )
@@ -57,11 +59,11 @@ export function LoadingSpinner({
 /** Skeleton loader for cards */
 export function CardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-lg border bg-card p-6 animate-pulse", className)}>
+    <div className={cn("animate-pulse rounded-2xl border border-border/70 bg-card/75 p-6", className)}>
       <div className="space-y-3">
-        <div className="h-4 w-1/3 bg-muted rounded" />
-        <div className="h-8 w-1/2 bg-muted rounded" />
-        <div className="h-3 w-2/3 bg-muted rounded" />
+        <div className="h-4 w-1/3 rounded bg-muted" />
+        <div className="h-8 w-1/2 rounded bg-muted" />
+        <div className="h-3 w-2/3 rounded bg-muted" />
       </div>
     </div>
   )
@@ -71,18 +73,18 @@ export function CardSkeleton({ className }: { className?: string }) {
 export function TableSkeleton({ rows = 5, columns = 4 }: { rows?: number; columns?: number }) {
   return (
     <div className="w-full animate-pulse">
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/75">
         {/* Header */}
         <div className="bg-muted/50 p-4 flex gap-4">
           {Array.from({ length: columns }).map((_, i) => (
-            <div key={i} className="h-4 flex-1 bg-muted rounded" />
+            <div key={i} className="h-4 flex-1 rounded bg-muted" />
           ))}
         </div>
         {/* Rows */}
         {Array.from({ length: rows }).map((_, rowIndex) => (
-          <div key={rowIndex} className="p-4 flex gap-4 border-t">
+          <div key={rowIndex} className="flex gap-4 border-t border-border/60 p-4">
             {Array.from({ length: columns }).map((_, colIndex) => (
-              <div key={colIndex} className="h-4 flex-1 bg-muted rounded" />
+              <div key={colIndex} className="h-4 flex-1 rounded bg-muted" />
             ))}
           </div>
         ))}

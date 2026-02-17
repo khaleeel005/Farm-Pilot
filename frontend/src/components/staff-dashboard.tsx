@@ -107,6 +107,7 @@ export function StaffDashboard({ onNavigate }: StaffDashboardProps) {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Staff Console"
         title={`${getGreeting()}, ${user?.username || 'Staff'}!`}
         description="Here's your daily overview and tasks"
         actions={

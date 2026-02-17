@@ -48,6 +48,7 @@ import {
 } from "@/types";
 import { FeedBatch } from "@/types/entities/feed";
 import { useToastContext } from "@/hooks";
+import { PageHeader } from "@/components/shared/page-header";
 
 // Local worker type for this component
 interface Worker {
@@ -384,14 +385,11 @@ export function DailyEntryForm() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl sm:text-3xl font-bold text-balance">
-          Daily Entry
-        </h2>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Record today's production, feed usage, and observations
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Daily Operations"
+        title="Daily Entry"
+        description="Record today's production, feed usage, and observations"
+      />
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <div className="space-y-6">
@@ -411,8 +409,8 @@ export function DailyEntryForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
                   <Label htmlFor="house">Select House/Coop</Label>
                   <Select
                     value={selectedHouse}
@@ -442,9 +440,9 @@ export function DailyEntryForm() {
                   </Select>
                 </div>
 
-                <Separator />
+                <Separator className="opacity-60" />
 
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
                   <div className="flex items-center gap-2">
                     <Egg className="h-4 w-4" />
                     <Label className="text-base font-medium">
@@ -468,7 +466,7 @@ export function DailyEntryForm() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/45 p-3">
                     <span className="font-medium">Total Eggs:</span>
                     <Badge variant="secondary" className="text-lg px-3 py-1">
                       {parseInt(formData.eggsCollected) || 0} eggs
@@ -476,9 +474,9 @@ export function DailyEntryForm() {
                   </div>
                 </div>
 
-                <Separator />
+                <Separator className="opacity-60" />
 
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     <Label className="text-base font-medium">
@@ -486,7 +484,7 @@ export function DailyEntryForm() {
                     </Label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="mortality">Mortality Count</Label>
                       <Input
@@ -519,7 +517,7 @@ export function DailyEntryForm() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="feed-batch">Feed Batch</Label>
                       <Select

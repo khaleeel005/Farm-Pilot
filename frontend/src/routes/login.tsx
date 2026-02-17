@@ -19,7 +19,7 @@ import {
 import { login as apiLogin } from "@/lib/api";
 import { useUser } from "@/context/UserContext";
 import { useToastContext } from "@/context/ToastContext";
-import { Egg, Lock } from "lucide-react";
+import { Egg, Lock, Leaf } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -92,19 +92,29 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-emerald-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto h-16 w-16 rounded-full bg-primary flex items-center justify-center">
-            <Egg className="h-8 w-8 text-primary-foreground" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-[-8rem] top-[-8rem] h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute right-[-10rem] top-20 h-80 w-80 rounded-full bg-accent/20 blur-3xl" />
+        <div className="absolute bottom-[-6rem] left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-chart-2/15 blur-3xl" />
+      </div>
+
+      <Card className="fade-rise relative w-full max-w-md border-border/60 bg-card/85 shadow-[0_28px_80px_-36px_oklch(0.2_0.03_60/0.6)] backdrop-blur">
+        <CardHeader className="space-y-5 text-center">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.45rem] bg-primary shadow-lg shadow-primary/25">
+            <Egg className="h-9 w-9 text-primary-foreground" />
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold text-balance">
-              Welcome to Farm Pilot
+          <div className="space-y-2">
+            <CardTitle className="display-heading text-4xl leading-tight text-balance">
+              Farm Pilot
             </CardTitle>
-            <CardDescription className="text-balance">
-              Sign in to manage your egg production operations
+            <CardDescription className="mx-auto max-w-xs text-balance text-base">
+              Precision operations for your egg production floor.
             </CardDescription>
+          </div>
+          <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-border/80 bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Leaf className="h-3.5 w-3.5 text-primary" />
+            Field-ready control panel
           </div>
         </CardHeader>
         <CardContent>
@@ -121,6 +131,7 @@ function LoginPage() {
                 onChange={(e) =>
                   setLoginForm({ ...loginForm, username: e.target.value })
                 }
+                className="h-11 border-border/70 bg-background/85"
                 required
               />
             </div>
@@ -136,10 +147,15 @@ function LoginPage() {
                 onChange={(e) =>
                   setLoginForm({ ...loginForm, password: e.target.value })
                 }
+                className="h-11 border-border/70 bg-background/85"
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loginLoading}>
+            <Button
+              type="submit"
+              className="h-11 w-full rounded-xl"
+              disabled={loginLoading}
+            >
               {loginLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -154,7 +170,7 @@ function LoginPage() {
             </Button>
           </form>
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Please sign in with your account credentials.</p>
+            <p>Use your account credentials to continue.</p>
           </div>
         </CardContent>
       </Card>

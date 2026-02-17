@@ -217,7 +217,7 @@ export function HouseManagement() {
         open={!!deleteConfirmHouse}
         onOpenChange={(open) => !open && setDeleteConfirmHouse(null)}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Delete House</DialogTitle>
             <DialogDescription>
@@ -247,6 +247,7 @@ export function HouseManagement() {
 
       {/* Header */}
       <PageHeader
+        eyebrow="Farm Infrastructure"
         title="House Management"
         description="Manage your farm houses and bird populations"
         actions={
@@ -259,7 +260,7 @@ export function HouseManagement() {
                 </Button>
               </DialogTrigger>
             )}
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
                   {editingHouse ? "Edit House" : "Add New House"}
@@ -270,8 +271,8 @@ export function HouseManagement() {
                     : "Create a new house for your farm"}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
+              <div className="space-y-5">
+                <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
                   <Label htmlFor="houseName">House Name</Label>
                   <Input
                     id="houseName"
@@ -282,7 +283,7 @@ export function HouseManagement() {
                     }
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="capacity">Capacity</Label>
                     <Input
@@ -314,39 +315,41 @@ export function HouseManagement() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    placeholder="e.g., North Section, Block A"
-                    value={formData.location}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        location: e.target.value,
-                      }))
-                    }
-                  />
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      placeholder="e.g., North Section, Block A"
+                      value={formData.location}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          location: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <select
+                      id="status"
+                      className="h-10 w-full rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          status: e.target.value as House["status"],
+                        }))
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        status: e.target.value as House["status"],
-                      }))
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
                   <Label htmlFor="description">Notes (optional)</Label>
                   <Textarea
                     id="description"
@@ -370,7 +373,7 @@ export function HouseManagement() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -379,7 +382,7 @@ export function HouseManagement() {
             <Egg className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{houses.length}</div>
+            <div className="display-heading text-3xl leading-none">{houses.length}</div>
             <p className="text-xs text-muted-foreground">
               {activeHouses} active
             </p>
@@ -393,7 +396,7 @@ export function HouseManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {totalCapacity.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">birds maximum</p>
@@ -407,7 +410,7 @@ export function HouseManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {totalBirds.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -419,7 +422,9 @@ export function HouseManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Houses Overview</CardTitle>
+          <CardTitle className="display-heading text-2xl">
+            Houses Overview
+          </CardTitle>
           <CardDescription>
             Manage all your farm houses and their details
           </CardDescription>

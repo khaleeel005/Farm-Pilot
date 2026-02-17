@@ -62,7 +62,7 @@ const variantColors: Record<EmptyStateVariant, string> = {
   feed: "text-amber-500",
   sales: "text-green-500",
   customers: "text-blue-500",
-  houses: "text-purple-500",
+  houses: "text-emerald-500",
   workers: "text-cyan-500",
   staff: "text-teal-500",
   reports: "text-indigo-500",
@@ -86,19 +86,19 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-12 px-4 text-center",
+        "flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card/45 px-4 py-12 text-center",
         className
       )}
     >
-      <div className={cn("rounded-full bg-muted p-4 mb-4", iconColor)}>
+      <div className={cn("mb-4 rounded-2xl bg-muted/70 p-4", iconColor)}>
         <Icon className="h-8 w-8" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+      <h3 className="display-heading mb-1 text-2xl text-foreground">{title}</h3>
       {description && (
-        <p className="text-sm text-muted-foreground max-w-sm mb-4">{description}</p>
+        <p className="mb-4 max-w-sm text-sm text-muted-foreground">{description}</p>
       )}
       {actionLabel && onAction && (
-        <Button onClick={onAction} disabled={actionDisabled}>
+        <Button onClick={onAction} disabled={actionDisabled} className="rounded-xl">
           {actionLabel}
         </Button>
       )}

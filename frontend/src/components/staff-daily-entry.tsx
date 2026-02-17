@@ -182,6 +182,7 @@ export function StaffDailyEntry() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Daily Operations"
         title="Daily Log Entry"
         description="Record today's egg collection, feed usage, and observations"
         actions={

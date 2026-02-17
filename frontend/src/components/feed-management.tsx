@@ -332,6 +332,7 @@ export function FeedManagement() {
     return (
       <div className="space-y-6">
         <PageHeader
+          eyebrow="Feed Operations"
           title="Feed Management"
           description="Create and manage feed batches with flexible ingredients"
         />
@@ -377,8 +378,8 @@ export function FeedManagement() {
           New Feed Batch
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[90vw] max-w-7xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader className="pb-4">
+      <DialogContent className="max-h-[94vh] w-[98vw] max-w-[110rem] overflow-y-auto p-5 sm:p-7">
+        <DialogHeader className="rounded-xl border border-border/70 bg-background/55 p-5 sm:p-6">
           <DialogTitle className="text-lg sm:text-xl">
             Create New Feed Batch
           </DialogTitle>
@@ -387,10 +388,17 @@ export function FeedManagement() {
             batch
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 sm:space-y-6">
+        <div className="mt-5 space-y-6 sm:space-y-7">
           {/* Basic Batch Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
+          <div className="space-y-5 rounded-xl border border-border/70 bg-background/55 p-5 sm:p-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                Step 1
+              </p>
+              <h3 className="display-heading text-2xl">Batch Details</h3>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-3 lg:col-span-2">
               <Label htmlFor="batchName">Batch Name</Label>
               <Input
                 id="batchName"
@@ -401,7 +409,7 @@ export function FeedManagement() {
                 placeholder="e.g. Layer Feed Batch #001"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="batchDate">Batch Date</Label>
               <Input
                 id="batchDate"
@@ -412,7 +420,7 @@ export function FeedManagement() {
                 }
               />
             </div>
-            <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+            <div className="space-y-3">
               <Label htmlFor="bagSize">Bag Size (kg)</Label>
               <Input
                 id="bagSize"
@@ -428,7 +436,7 @@ export function FeedManagement() {
                 placeholder="50.00"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-3 sm:col-span-2 lg:col-span-4">
               <Label htmlFor="miscellaneousCost">
                 Miscellaneous Expenses (₦)
               </Label>
@@ -450,14 +458,23 @@ export function FeedManagement() {
                 processing costs
               </p>
             </div>
+            </div>
           </div>
 
           <Separator />
 
           {/* Ingredients Section */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
-              <h3 className="text-lg font-semibold">Ingredients</h3>
+          <div className="space-y-5 rounded-xl border border-border/70 bg-background/55 p-5 sm:p-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                Step 2
+              </p>
+              <h3 className="display-heading text-2xl">Ingredient Inputs</h3>
+              <p className="text-sm text-muted-foreground">
+                Enter ingredient source, quantity, and cost for each line item.
+              </p>
+            </div>
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center sm:gap-0">
               <Button
                 onClick={addIngredient}
                 variant="outline"
@@ -470,85 +487,90 @@ export function FeedManagement() {
             </div>
 
             {newBatch.ingredients.map((ingredient, index) => (
-              <Card key={index} className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                    <Label>Ingredient Name</Label>
-                    <Input
-                      value={ingredient.ingredientName}
-                      onChange={(e) =>
-                        updateIngredient(
-                          index,
-                          "ingredientName",
-                          e.target.value,
-                        )
-                      }
-                      placeholder="e.g. Corn, Soybean"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Quantity (kg)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={ingredient.quantityKg || ""}
-                      onChange={(e) =>
-                        updateIngredient(
-                          index,
-                          "quantityKg",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
-                      placeholder="500.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Total Cost (₦)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={ingredient.totalCost || ""}
-                      onChange={(e) =>
-                        updateIngredient(
-                          index,
-                          "totalCost",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
-                      placeholder="100000.00"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                    <Label>Supplier (Optional)</Label>
-                    <Input
-                      value={ingredient.supplier || ""}
-                      onChange={(e) =>
-                        updateIngredient(index, "supplier", e.target.value)
-                      }
-                      placeholder="Lagos Grains Ltd"
-                    />
-                  </div>
-                  <div className="flex flex-col justify-end gap-2 sm:col-span-2 lg:col-span-4 xl:col-span-1">
-                    <div className="text-sm text-muted-foreground text-center">
-                      {ingredient.quantityKg > 0 &&
-                        ingredient.totalCost > 0 && (
-                          <div className="font-medium">
-                            ₦
-                            {(
-                              ingredient.totalCost / ingredient.quantityKg
-                            ).toFixed(2)}
-                            /kg
-                          </div>
-                        )}
+              <Card
+                key={index}
+                className="border-border/70 bg-background/45 p-6 sm:p-7"
+              >
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <div className="space-y-3">
+                      <Label>Ingredient Name</Label>
+                      <Input
+                        value={ingredient.ingredientName}
+                        onChange={(e) =>
+                          updateIngredient(
+                            index,
+                            "ingredientName",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="e.g. Corn, Soybean"
+                      />
                     </div>
+                    <div className="space-y-3">
+                      <Label>Supplier (Optional)</Label>
+                      <Input
+                        value={ingredient.supplier || ""}
+                        onChange={(e) =>
+                          updateIngredient(index, "supplier", e.target.value)
+                        }
+                        placeholder="Lagos Grains Ltd"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <div className="space-y-3">
+                      <Label>Quantity (kg)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={ingredient.quantityKg || ""}
+                        onChange={(e) =>
+                          updateIngredient(
+                            index,
+                            "quantityKg",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        placeholder="500.00"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Total Cost (₦)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={ingredient.totalCost || ""}
+                        onChange={(e) =>
+                          updateIngredient(
+                            index,
+                            "totalCost",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        placeholder="100000.00"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-muted-foreground">Unit Cost</div>
+                    {ingredient.quantityKg > 0 && ingredient.totalCost > 0 ? (
+                      <div className="font-medium text-foreground">
+                        ₦{(ingredient.totalCost / ingredient.quantityKg).toFixed(2)}
+                        /kg
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">-</div>
+                    )}
                     {newBatch.ingredients.length > 1 && (
                       <Button
                         onClick={() => removeIngredient(index)}
                         variant="outline"
                         size="sm"
-                        className="text-red-600 hover:text-red-700 w-full"
+                        className="w-full text-red-600 hover:text-red-700 sm:w-auto"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
+                        Remove
                       </Button>
                     )}
                   </div>
@@ -557,7 +579,13 @@ export function FeedManagement() {
             ))}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5 rounded-xl border border-border/70 bg-background/55 p-5 sm:p-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                Step 3
+              </p>
+              <h3 className="display-heading text-2xl">Cost Review</h3>
+            </div>
             <Button
               onClick={calculateCost}
               variant="outline"
@@ -568,10 +596,10 @@ export function FeedManagement() {
             </Button>
 
             {costEstimate && (
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-4">
+              <Card className="border-primary/30 bg-primary/8">
+                <CardContent className="p-5">
                   <h4 className="font-semibold mb-3">Cost Estimate</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
                     <div className="text-center sm:text-left">
                       <div className="text-muted-foreground">
                         Total Quantity
@@ -624,7 +652,7 @@ export function FeedManagement() {
           </div>
 
           {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row justify-end gap-3">
+          <div className="flex flex-col justify-end gap-3 pt-1 sm:flex-row">
             <Button
               onClick={() => {
                 setShowNewBatch(false);
@@ -662,6 +690,7 @@ export function FeedManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Feed Operations"
         title="Feed Management"
         description="Create and manage feed batches with flexible ingredients"
         actions={headerActions}
@@ -842,7 +871,7 @@ export function FeedManagement() {
         open={deleteConfirm.show}
         onOpenChange={(open) => !open && setDeleteConfirm({ show: false })}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[470px]">
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
@@ -877,7 +906,7 @@ export function FeedManagement() {
           open={formErrors.length > 0}
           onOpenChange={(open) => !open && setFormErrors([])}
         >
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[470px]">
             <DialogHeader>
               <DialogTitle className="text-red-600 flex items-center gap-2">
                 <Trash2 className="h-5 w-5" />

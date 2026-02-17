@@ -49,6 +49,7 @@ import formatCurrency from "@/lib/format";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageHeader } from "@/components/shared/page-header";
 
 export function StaffManagement() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -156,59 +157,76 @@ export function StaffManagement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Staff Management
-          </h2>
-          <p className="text-muted-foreground">
-            Manage your farm supervisors and staff members
-          </p>
-        </div>
-        <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+      <PageHeader
+        eyebrow="People Ops"
+        title="Staff Management"
+        description="Manage your farm supervisors and staff members"
+        actions={
+          <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Add Staff Member
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[620px]">
             <DialogHeader>
               <DialogTitle>Add New Staff Member</DialogTitle>
               <DialogDescription>
                 Add a new staff member to your farm team.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="username" className="text-right">
-                  Username
-                </Label>
-                <Input
-                  id="name"
-                  className="col-span-3"
-                  value={newStaff.username}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, username: e.target.value }))
-                  }
-                />
+            <div className="space-y-4 py-2">
+              <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                  Step 1
+                </p>
+                <h3 className="display-heading text-2xl">Account Basics</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      value={newStaff.username}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, username: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={newStaff.password}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, password: e.target.value }))
+                      }
+                      placeholder="Defaults to changeme"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="department" className="text-right">
-                  Department
-                </Label>
-                <Select>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="production">Production</SelectItem>
-                    <SelectItem value="feed">Feed</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
-                    <SelectItem value="sales">Sales</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                  Step 2
+                </p>
+                <h3 className="display-heading text-2xl">Role Metadata</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="production">Production</SelectItem>
+                      <SelectItem value="feed">Feed</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="sales">Sales</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* <div className="grid grid-cols-4 items-center gap-4">
@@ -250,11 +268,12 @@ export function StaffManagement() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
-      </div>
+          </Dialog>
+        }
+      />
 
       {/* Stats Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -263,7 +282,7 @@ export function StaffManagement() {
             <UserCheck className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{totalStaff}</div>
+            <div className="display-heading text-3xl leading-none">{totalStaff}</div>
             <p className="text-xs text-muted-foreground">+1 from last month</p>
           </CardContent>
         </Card>
@@ -275,7 +294,7 @@ export function StaffManagement() {
             <Clock className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">{activeStaff}</div>
+            <div className="display-heading text-3xl leading-none">{activeStaff}</div>
             <p className="text-xs text-muted-foreground">1 on leave</p>
           </CardContent>
         </Card>
@@ -287,7 +306,7 @@ export function StaffManagement() {
             <TrendingUp className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {avgPerformance}%
             </div>
             <p className="text-xs text-muted-foreground">+5% from last month</p>
@@ -301,7 +320,7 @@ export function StaffManagement() {
             <DollarSign className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold truncate">
+            <div className="display-heading text-3xl leading-none truncate">
               {formatCurrency(totalPayroll)}
             </div>
             <p className="text-xs text-muted-foreground">Monthly total</p>
@@ -326,7 +345,7 @@ export function StaffManagement() {
       {/* Staff Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Staff Members</CardTitle>
+          <CardTitle className="display-heading text-2xl">Staff Members</CardTitle>
           <CardDescription>
             Manage your farm staff and their details
           </CardDescription>

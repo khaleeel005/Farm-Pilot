@@ -298,6 +298,7 @@ export function ReportsSection() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Intelligence"
         title="Reports & Analytics"
         description="Comprehensive business insights and data export"
         actions={headerActions}
@@ -306,13 +307,13 @@ export function ReportsSection() {
       {/* Report Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="display-heading flex items-center gap-2 text-2xl">
             <Calendar className="h-5 w-5" />
             Report Configuration
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label>Date Range</Label>
               <Select value={dateRange} onValueChange={setDateRange}>
@@ -359,7 +360,7 @@ export function ReportsSection() {
       </Card>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">
             Overview
           </TabsTrigger>
@@ -385,7 +386,7 @@ export function ReportsSection() {
                 <BarChart3 className="h-4 w-4 text-muted-foreground hidden sm:block" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="display-heading text-3xl leading-none">
                   {totalEggs.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -402,7 +403,7 @@ export function ReportsSection() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground hidden sm:block" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="display-heading text-3xl leading-none">
                   ₦{totalRevenue.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -419,7 +420,7 @@ export function ReportsSection() {
                 <PieChart className="h-4 w-4 text-muted-foreground hidden sm:block" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl sm:text-2xl font-bold">
+                <div className="display-heading text-3xl leading-none">
                   {profitMargin}%
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -432,7 +433,9 @@ export function ReportsSection() {
           {/* Weekly Performance */}
           <Card>
             <CardHeader>
-              <CardTitle>Weekly Performance Summary</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Weekly Performance Summary
+              </CardTitle>
               <CardDescription>
                 Production, sales, and profit trends
               </CardDescription>
@@ -527,7 +530,9 @@ export function ReportsSection() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Production Log</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Production Log
+              </CardTitle>
               <CardDescription>Daily production records</CardDescription>
             </CardHeader>
             <CardContent>
@@ -634,7 +639,9 @@ export function ReportsSection() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Top Customers</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Top Customers
+              </CardTitle>
               <CardDescription>
                 Best performing customers by revenue
               </CardDescription>
@@ -739,19 +746,21 @@ export function ReportsSection() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Profit & Loss Summary</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Profit & Loss Summary
+              </CardTitle>
               <CardDescription>Financial performance overview</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-3 border rounded-lg">
+                <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
                   <span className="font-medium text-sm">Total Revenue</span>
                   <span className="text-base sm:text-lg font-bold text-chart-5">
                     ₦{totalRevenue.toLocaleString()}
                   </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-3 border rounded-lg">
+                <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
                   <span className="font-medium text-sm">
                     Total Operating Costs
                   </span>
@@ -762,7 +771,7 @@ export function ReportsSection() {
 
                 <Separator />
 
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex flex-col justify-between gap-2 rounded-lg border border-primary/25 bg-primary/10 p-3 sm:flex-row sm:items-center sm:p-4">
                   <span className="text-base sm:text-lg font-medium">
                     Net Profit
                   </span>
@@ -773,7 +782,7 @@ export function ReportsSection() {
                   </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 p-3 border rounded-lg">
+                <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
                   <span className="font-medium text-sm">Profit Margin</span>
                   <Badge
                     variant={
@@ -797,7 +806,7 @@ export function ReportsSection() {
       {canExport && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="display-heading flex items-center gap-2 text-2xl">
               <FileSpreadsheet className="h-5 w-5" />
               Quick Export Options
             </CardTitle>

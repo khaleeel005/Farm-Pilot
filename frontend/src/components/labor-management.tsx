@@ -133,6 +133,7 @@ export function LaborManagement() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
+        eyebrow="Workforce"
         title="Labor Management"
         description="Manage workers, attendance, and payroll"
         actions={
@@ -150,13 +151,13 @@ export function LaborManagement() {
 
       {/* Add Worker Modal */}
       <Dialog open={showNewWorker} onOpenChange={setShowNewWorker}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add New Worker</DialogTitle>
             <DialogDescription>Register a new employee</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Full Name</Label>
                 <Input
@@ -175,7 +176,7 @@ export function LaborManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Monthly Salary (₦)</Label>
                 <Input
@@ -211,7 +212,7 @@ export function LaborManagement() {
         open={!!deleteConfirmWorker}
         onOpenChange={(open) => !open && setDeleteConfirmWorker(null)}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-[470px]">
           <DialogHeader>
             <DialogTitle>Delete Worker</DialogTitle>
             <DialogDescription>
@@ -240,7 +241,7 @@ export function LaborManagement() {
       </Dialog>
 
       {/* Labor Overview */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -249,7 +250,7 @@ export function LaborManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {workers.length}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -266,7 +267,7 @@ export function LaborManagement() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold truncate">
+            <div className="display-heading text-3xl leading-none truncate">
               ₦
               {payrollData
                 .reduce((sum, p) => sum + Number(p.finalSalary || 0), 0)
@@ -284,7 +285,7 @@ export function LaborManagement() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
+            <div className="display-heading text-3xl leading-none">
               {payrollData.filter((p) => p.paymentStatus === "pending").length}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -295,7 +296,7 @@ export function LaborManagement() {
       </div>
 
       <Tabs defaultValue="workers" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1">
           <TabsTrigger value="workers">Workers</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
         </TabsList>
@@ -304,7 +305,9 @@ export function LaborManagement() {
         <TabsContent value="workers" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Worker Directory</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Worker Directory
+              </CardTitle>
               <CardDescription>Manage your workforce</CardDescription>
             </CardHeader>
             <CardContent>
@@ -323,7 +326,7 @@ export function LaborManagement() {
                   {workers.map((worker) => (
                     <div
                       key={worker.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 border rounded-lg"
+                      className="flex flex-col justify-between gap-3 rounded-xl border border-border/70 bg-background/55 p-3 sm:flex-row sm:items-center sm:p-4"
                     >
                       <div className="space-y-1">
                         <div className="font-medium text-sm sm:text-base">
@@ -376,7 +379,9 @@ export function LaborManagement() {
         <TabsContent value="payroll" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Payroll - January 2025</CardTitle>
+              <CardTitle className="display-heading text-2xl">
+                Monthly Payroll - January 2025
+              </CardTitle>
               <CardDescription>
                 Salary calculations and payment status
               </CardDescription>
