@@ -1,6 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getSales, createSale, getCustomers, createCustomer } from '@/lib/api';
-import { Sale, SalePayload, Customer, CustomerPayload } from '@/types';
+import { useMemo } from "react";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  createCustomer,
+  createSale,
+  getCustomers,
+  getSales,
+} from "@/lib/api";
+import {
+  calculateSalesOverview,
+  type SalesOverviewMetrics,
+} from "@/lib/salesManagement";
+import type { Customer, CustomerPayload, Sale, SalePayload } from "@/types";
 
 export interface SalesFilters {
   startDate?: string;
@@ -9,149 +24,117 @@ export interface SalesFilters {
   paymentStatus?: string;
 }
 
+export type SalesSummary = SalesOverviewMetrics;
+
 export interface UseSalesReturn {
   sales: Sale[];
   customers: Customer[];
   loading: boolean;
   error: Error | null;
-  refreshSales: (filters?: SalesFilters) => Promise<void>;
-  refreshCustomers: () => Promise<void>;
-  createSale: (payload: SalePayload) => Promise<Sale | null>;
-  createCustomer: (payload: CustomerPayload) => Promise<Customer | null>;
-  getSalesSummary: () => SalesSummary;
-  getCustomerById: (id: string) => Customer | undefined;
+  refresh: () => Promise<void>;
+  createSale: (payload: SalePayload) => Promise<Sale>;
+  createCustomer: (payload: CustomerPayload) => Promise<Customer>;
+  summary: SalesSummary;
+  isCreatingSale: boolean;
+  isCreatingCustomer: boolean;
+  isMutating: boolean;
 }
 
-export interface SalesSummary {
-  totalRevenue: number;
-  totalSales: number;
-  paidAmount: number;
-  pendingAmount: number;
-  totalQuantity: number;
+const SALES_QUERY_KEY = ["sales"] as const;
+const CUSTOMERS_QUERY_KEY = ["customers"] as const;
+
+function normalizeSalesFilters(filters: SalesFilters = {}) {
+  const normalizedFilters: Record<string, string> = {};
+
+  if (filters.startDate) {
+    normalizedFilters.startDate = filters.startDate;
+  }
+
+  if (filters.endDate) {
+    normalizedFilters.endDate = filters.endDate;
+  }
+
+  if (filters.customerId) {
+    normalizedFilters.customerId = filters.customerId;
+  }
+
+  if (filters.paymentStatus) {
+    normalizedFilters.paymentStatus = filters.paymentStatus;
+  }
+
+  return normalizedFilters;
 }
 
-/**
- * Hook for managing sales and customers with summary calculations
- */
+export function salesQueryOptions(filters: SalesFilters = {}) {
+  const normalizedFilters = normalizeSalesFilters(filters);
+
+  return queryOptions({
+    queryKey: [...SALES_QUERY_KEY, normalizedFilters],
+    queryFn: () => getSales(normalizedFilters),
+  });
+}
+
+export function customersQueryOptions() {
+  return queryOptions({
+    queryKey: CUSTOMERS_QUERY_KEY,
+    queryFn: getCustomers,
+  });
+}
+
 export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
+  const salesQuery = useQuery(salesQueryOptions(initialFilters));
+  const customersQuery = useQuery(customersQueryOptions());
 
-  const refreshSales = useCallback(async (filters: SalesFilters = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const filterParams: Record<string, string> = {};
-      if (filters.startDate) filterParams.startDate = filters.startDate;
-      if (filters.endDate) filterParams.endDate = filters.endDate;
-      if (filters.customerId) filterParams.customerId = filters.customerId;
-      if (filters.paymentStatus) filterParams.paymentStatus = filters.paymentStatus;
-
-      const data = await getSales(filterParams);
-      setSales(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setSales([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refreshCustomers = useCallback(async () => {
-    try {
-      const data = await getCustomers();
-      setCustomers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setCustomers([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    Promise.all([refreshSales(initialFilters), refreshCustomers()]);
-  }, [refreshSales, refreshCustomers, initialFilters]);
-
-  const handleCreateSale = useCallback(
-    async (payload: SalePayload): Promise<Sale | null> => {
-      try {
-        const newSale = await createSale(payload);
-        if (newSale) {
-          setSales((prev) => [...prev, newSale]);
-          return newSale;
-        }
-        return null;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        return null;
-      }
+  const createSaleMutation = useMutation({
+    mutationFn: createSale,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: SALES_QUERY_KEY });
     },
-    []
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: createCustomer,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CUSTOMERS_QUERY_KEY });
+    },
+  });
+
+  const summary = useMemo(
+    () =>
+      calculateSalesOverview(
+        salesQuery.data ?? [],
+        customersQuery.data ?? [],
+      ),
+    [customersQuery.data, salesQuery.data],
   );
 
-  const handleCreateCustomer = useCallback(
-    async (payload: CustomerPayload): Promise<Customer | null> => {
-      try {
-        const newCustomer = await createCustomer(payload);
-        if (newCustomer) {
-          setCustomers((prev) => [...prev, newCustomer]);
-          return newCustomer;
-        }
-        return null;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        return null;
-      }
-    },
-    []
-  );
-
-  const getSalesSummary = useCallback((): SalesSummary => {
-    const summary = sales.reduce(
-      (acc, sale) => {
-        acc.totalRevenue += sale.totalAmount || 0;
-        acc.totalSales += 1;
-        acc.totalQuantity += sale.quantity || 0;
-
-        if (sale.paymentStatus === 'paid') {
-          acc.paidAmount += sale.totalAmount || 0;
-        } else {
-          acc.pendingAmount += sale.totalAmount || 0;
-        }
-
-        return acc;
-      },
-      {
-        totalRevenue: 0,
-        totalSales: 0,
-        paidAmount: 0,
-        pendingAmount: 0,
-        totalQuantity: 0,
-      }
-    );
-
-    return summary;
-  }, [sales]);
-
-  const getCustomerById = useCallback(
-    (id: string): Customer | undefined => {
-      return customers.find((c) => String(c.id) === String(id));
-    },
-    [customers]
-  );
+  const error =
+    salesQuery.error ||
+    customersQuery.error ||
+    createSaleMutation.error ||
+    createCustomerMutation.error ||
+    null;
 
   return {
-    sales,
-    customers,
-    loading,
-    error,
-    refreshSales,
-    refreshCustomers,
-    createSale: handleCreateSale,
-    createCustomer: handleCreateCustomer,
-    getSalesSummary,
-    getCustomerById,
+    sales: salesQuery.data ?? [],
+    customers: customersQuery.data ?? [],
+    loading: salesQuery.isPending || customersQuery.isPending,
+    error: error instanceof Error ? error : null,
+    refresh: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: SALES_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: CUSTOMERS_QUERY_KEY }),
+      ]);
+      await Promise.all([salesQuery.refetch(), customersQuery.refetch()]);
+    },
+    createSale: (payload) => createSaleMutation.mutateAsync(payload),
+    createCustomer: (payload) => createCustomerMutation.mutateAsync(payload),
+    summary,
+    isCreatingSale: createSaleMutation.isPending,
+    isCreatingCustomer: createCustomerMutation.isPending,
+    isMutating:
+      createSaleMutation.isPending || createCustomerMutation.isPending,
   };
 }
 

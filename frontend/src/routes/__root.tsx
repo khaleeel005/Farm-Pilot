@@ -1,8 +1,10 @@
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 
 // Define the router context type
 export interface RouterContext {
+  queryClient: QueryClient;
   user: {
     id: number;
     username: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
   Card,
   CardContent,
@@ -29,101 +29,60 @@ import {
   Users,
   AlertCircle,
 } from "lucide-react";
+import type { DailyLogPayload } from "@/types";
 import {
-  createDailyLog,
-  getHouses,
-  getDailyLogs,
-  getLaborers,
-  listStaff,
-  getFeedBatches,
-  getFeedBatchUsageStats,
-} from "@/lib/api";
-import {
-  House,
-  DailyLog,
-  DailyLogPayload,
-  TodaySummary,
-  Laborer,
-  BatchUsageStats,
-} from "@/types";
-import { FeedBatch } from "@/types/entities/feed";
-import { useToastContext } from "@/hooks";
+  useCreateDailyLog,
+  useDailyLogs,
+  useFeedInventory,
+  useFarmWorkers,
+  useHouses,
+  useToastContext,
+} from "@/hooks";
 import { PageHeader } from "@/components/shared/page-header";
-
-// Local worker type for this component
-interface Worker {
-  id: string;
-  name: string;
-  role: string;
-  attendanceStatus: string;
-  tasks: string[];
-}
+import {
+  buildDailyAlerts,
+  buildTodaySummary,
+  getTodayIsoDate,
+} from "@/lib/dailyLogs";
+import {
+  EMPTY_DAILY_LOG_FORM,
+  buildDailyLogPayload,
+  getSelectedBatchUsage,
+  validateFeedBagUsage,
+} from "@/lib/dailyLogForm";
 
 export function DailyEntryForm() {
   const [selectedHouse, setSelectedHouse] = useState("");
-  const [houses, setHouses] = useState<House[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const { houses, loading: housesLoading } = useHouses();
+  const {
+    feedBatches,
+    batchUsageStats,
+    loading: feedInventoryLoading,
+  } = useFeedInventory();
+  const todayIsoDate = useMemo(() => getTodayIsoDate(), []);
+  const { logs: todayLogs } = useDailyLogs({ date: todayIsoDate });
+  const { workers } = useFarmWorkers();
+  const createDailyLogMutation = useCreateDailyLog();
   const toast = useToastContext();
 
-  // Feed batch state
-  const [feedBatches, setFeedBatches] = useState<FeedBatch[]>([]);
-  const [batchUsageStats, setBatchUsageStats] = useState<BatchUsageStats[]>([]);
-
-  const loadFeedBatches = async () => {
-    try {
-      const [batchesData, usageStatsData] = await Promise.all([
-        getFeedBatches(),
-        getFeedBatchUsageStats(),
-      ]);
-      setFeedBatches(Array.isArray(batchesData) ? batchesData : []);
-      setBatchUsageStats(Array.isArray(usageStatsData) ? usageStatsData : []);
-    } catch (error) {
-      console.error("Failed to load feed batches:", error);
-      setFeedBatches([]);
-      setBatchUsageStats([]);
-    }
-  };
-
-  useEffect(() => {
-    loadFeedBatches();
-  }, []);
-
-  // Dynamic data states
-  const [todaySummary, setTodaySummary] = useState<TodaySummary>({
-    totalEggs: 0,
-    housesLogged: 0,
-    totalHouses: 0,
-    houseBreakdown: [],
-  });
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [alerts, setAlerts] = useState<string[]>([]);
-
-  const [formData, setFormData] = useState({
-    eggsCollected: "",
-    crackedEggs: "",
-    mortalityCount: "",
-    feedBatchId: "",
-    feedBagsUsed: "",
-    notes: "",
-  });
-
+  const [formData, setFormData] = useState({ ...EMPTY_DAILY_LOG_FORM });
   const [feedBagsError, setFeedBagsError] = useState<string>("");
+  const todaySummary = useMemo(
+    () => buildTodaySummary(todayLogs, houses.length),
+    [houses.length, todayLogs],
+  );
+  const alerts = useMemo(
+    () => buildDailyAlerts(batchUsageStats, todaySummary),
+    [batchUsageStats, todaySummary],
+  );
 
   // Validation function to check if bags used exceeds remaining
   const validateFeedBags = () => {
-    if (!formData.feedBatchId || !formData.feedBagsUsed) return true;
-
-    const selectedBatchUsage = batchUsageStats.find(
-      (stats) => stats.batchId === parseInt(formData.feedBatchId),
-    );
-
-    if (!selectedBatchUsage) return true;
-
-    const bagsUsed = parseFloat(formData.feedBagsUsed);
-    if (isNaN(bagsUsed) || bagsUsed <= 0) return true;
-
-    return bagsUsed <= selectedBatchUsage.remainingBags;
+    return validateFeedBagUsage(
+      batchUsageStats,
+      formData.feedBatchId,
+      formData.feedBagsUsed,
+    ).isValid;
   };
 
   // Form validation - checks all required fields and validation rules
@@ -135,185 +94,45 @@ export function DailyEntryForm() {
   };
 
   useEffect(() => {
-    if (formData.feedBatchId && batchUsageStats.length > 0) {
-      const selectedBatchUsage = batchUsageStats.find(
-        (stats) => stats.batchId === parseInt(formData.feedBatchId),
-      );
+    const selectedBatchUsage = getSelectedBatchUsage(
+      batchUsageStats,
+      formData.feedBatchId,
+    );
 
-      if (selectedBatchUsage && selectedBatchUsage.remainingBags <= 0) {
-        setFormData((prev) => ({
-          ...prev,
-          feedBatchId: "",
-          feedBagsUsed: "",
-        }));
-        toast.warning(
-          "The selected feed batch is now finished and has been cleared from your selection.",
-        );
-      }
+    if (selectedBatchUsage && selectedBatchUsage.remainingBags <= 0) {
+      setFormData((prev) => ({
+        ...prev,
+        feedBatchId: "",
+        feedBagsUsed: "",
+      }));
+      toast.warning(
+        "The selected feed batch is now finished and has been cleared from your selection.",
+      );
     }
   }, [batchUsageStats, formData.feedBatchId, toast]);
 
-  const handleFeedBagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFeedBagsChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData((prev) => ({ ...prev, feedBagsUsed: value }));
 
-    // Clear previous error
+    const validation = validateFeedBagUsage(
+      batchUsageStats,
+      formData.feedBatchId,
+      value,
+    );
+    if (
+      !validation.isValid &&
+      validation.batchUsage &&
+      validation.bagsUsed !== null
+    ) {
+      setFeedBagsError(
+        `Cannot use ${validation.bagsUsed} bags. Only ${validation.batchUsage.remainingBags} bags remaining in this batch.`,
+      );
+      return;
+    }
+
     setFeedBagsError("");
-
-    // Only validate if we have a value and batch selected
-    if (value && formData.feedBatchId) {
-      const numValue = parseFloat(value);
-      const selectedBatch = batchUsageStats.find(
-        (stats) => stats.batchId === parseInt(formData.feedBatchId),
-      );
-
-      if (selectedBatch && !isNaN(numValue) && numValue > 0) {
-        if (numValue > selectedBatch.remainingBags) {
-          setFeedBagsError(
-            `Cannot use ${numValue} bags. Only ${selectedBatch.remainingBags} bags remaining in this batch.`,
-          );
-        }
-      }
-    }
   };
-
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [housesData] = await Promise.all([loadHouses(), loadWorkers()]);
-      await loadTodaysSummary(housesData.length);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadHouses = async (): Promise<House[]> => {
-    try {
-      const response = await getHouses();
-      const nextHouses = Array.isArray(response) ? response : [];
-      setHouses(nextHouses);
-      return nextHouses;
-    } catch (error) {
-      console.error("Failed to load houses:", error);
-      setHouses([]);
-      return [];
-    }
-  };
-
-  const loadTodaysSummary = async (totalHouses: number) => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const todaysLogs = await getDailyLogs({ date: today });
-
-      let totalEggs = 0;
-      const houseBreakdown: Array<{
-        houseId: number;
-        houseName: string;
-        eggs: number;
-      }> = [];
-
-      (Array.isArray(todaysLogs) ? todaysLogs : []).forEach((log: DailyLog) => {
-        totalEggs += log.eggsCollected || 0;
-        houseBreakdown.push({
-          houseId: log.houseId,
-          houseName: log.House?.houseName || `House ${log.houseId}`,
-          eggs: log.eggsCollected || 0,
-        });
-      });
-
-      setTodaySummary({
-        totalEggs,
-        housesLogged: houseBreakdown.length,
-        totalHouses,
-        houseBreakdown,
-      });
-    } catch (error) {
-      console.error("Failed to load today's summary:", error);
-    }
-  };
-
-  const loadWorkers = async () => {
-    try {
-      const [staffData, laborersData] = await Promise.all([
-        listStaff().catch(() => []),
-        getLaborers().catch(() => []),
-      ]);
-
-      const staffList = Array.isArray(staffData) ? staffData : [];
-      const laborersList = Array.isArray(laborersData) ? laborersData : [];
-
-      const staff = staffList.map(
-        (s: { id: number; fullName?: string; username?: string }) => ({
-          id: String(s.id),
-          name: s.fullName || s.username || "Unknown",
-          role: "Staff",
-          attendanceStatus: "present",
-          tasks: [] as string[],
-        }),
-      );
-
-      const laborers = laborersList.map((l: Laborer) => ({
-        id: String(l.id),
-        name: l.fullName,
-        role: "Laborer",
-        attendanceStatus: "present",
-        tasks: [] as string[],
-      }));
-
-      setWorkers([...staff, ...laborers]);
-    } catch (error) {
-      console.error("Failed to load workers:", error);
-    }
-  };
-
-  const loadAlerts = () => {
-    try {
-      const alertMessages: string[] = [];
-
-      // Check feed stock levels from batch usage stats
-      if (batchUsageStats.length > 0) {
-        const lowStockBatches = batchUsageStats.filter(
-          (stats) => stats.remainingBags > 0 && stats.usagePercentage >= 80,
-        );
-        const finishedBatches = batchUsageStats.filter(
-          (stats) => stats.remainingBags <= 0,
-        );
-
-        if (finishedBatches.length > 0) {
-          alertMessages.push(
-            `${finishedBatches.length} feed batch(es) depleted - order new stock`,
-          );
-        }
-        if (lowStockBatches.length > 0) {
-          alertMessages.push(
-            `${lowStockBatches.length} feed batch(es) running low (>80% used)`,
-          );
-        }
-      }
-
-      // Check if any houses haven't been logged today
-      if (
-        todaySummary.totalHouses > 0 &&
-        todaySummary.housesLogged < todaySummary.totalHouses
-      ) {
-        const unloggedCount =
-          todaySummary.totalHouses - todaySummary.housesLogged;
-        alertMessages.push(`${unloggedCount} house(s) still need daily logs`);
-      }
-
-      setAlerts(alertMessages);
-    } catch (error) {
-      console.error("Failed to load alerts:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadAlerts();
-  }, [batchUsageStats, todaySummary]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,42 +143,16 @@ export function DailyEntryForm() {
     }
 
     try {
-      setSubmitting(true);
+      const payload: DailyLogPayload = buildDailyLogPayload(
+        formData,
+        selectedHouse,
+        todayIsoDate,
+      );
 
-      const payload: DailyLogPayload = {
-        logDate: new Date().toISOString().split("T")[0],
-        houseId: parseInt(selectedHouse) || 0,
-        eggsCollected: parseInt(formData.eggsCollected) || 0,
-        crackedEggs: parseInt(formData.crackedEggs) || 0,
-        mortalityCount: parseInt(formData.mortalityCount) || 0,
-        feedBatchId: formData.feedBatchId
-          ? parseInt(formData.feedBatchId)
-          : undefined,
-        feedBagsUsed: formData.feedBagsUsed
-          ? parseFloat(formData.feedBagsUsed)
-          : undefined,
-        notes: formData.notes || undefined,
-      };
-
-      const result = await createDailyLog(payload);
-
-      if (result) {
-        toast.success("Daily log submitted successfully!");
-        setFormData({
-          eggsCollected: "",
-          crackedEggs: "",
-          mortalityCount: "",
-          feedBatchId: "",
-          feedBagsUsed: "",
-          notes: "",
-        });
-        setSelectedHouse("");
-        // Refresh data after successful submission
-        await loadTodaysSummary(houses.length);
-        await loadFeedBatches(); // Refresh feed batch stats to show updated usage
-      } else {
-        toast.error("Failed to submit daily log. Please try again.");
-      }
+      await createDailyLogMutation.mutateAsync(payload);
+      toast.success("Daily log submitted successfully!");
+      setFormData({ ...EMPTY_DAILY_LOG_FORM });
+      setSelectedHouse("");
     } catch (error: unknown) {
       console.error("Submit error:", error);
 
@@ -378,10 +171,13 @@ export function DailyEntryForm() {
 
       toast.error(errorMessage);
       setFeedBagsError(errorMessage);
-    } finally {
-      setSubmitting(false);
     }
   };
+
+  const selectedBatchUsage = getSelectedBatchUsage(
+    batchUsageStats,
+    formData.feedBatchId,
+  );
 
   return (
     <div className="space-y-6">
@@ -426,12 +222,12 @@ export function DailyEntryForm() {
                           {house.currentBirdCount} birds)
                         </SelectItem>
                       ))}
-                      {houses.length === 0 && !loading && (
+                      {houses.length === 0 && !housesLoading && (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
                           No houses available
                         </div>
                       )}
-                      {loading && (
+                      {housesLoading && (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
                           Loading houses...
                         </div>
@@ -611,53 +407,42 @@ export function DailyEntryForm() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="feed-bags">Feed Bags Used</Label>
-                      {(() => {
-                        const selectedBatchUsage = batchUsageStats.find(
-                          (stats) =>
-                            stats.batchId === parseInt(formData.feedBatchId),
-                        );
+                      <Input
+                        id="feed-bags"
+                        type="number"
+                        placeholder="0"
+                        min={0}
+                        step={0.1}
+                        max={
+                          selectedBatchUsage
+                            ? selectedBatchUsage.remainingBags
+                            : undefined
+                        }
+                        value={formData.feedBagsUsed}
+                        className={
+                          feedBagsError || !validateFeedBags()
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                            : ""
+                        }
+                        onChange={handleFeedBagsChange}
+                        disabled={!formData.feedBatchId}
+                      />
 
-                        return (
-                          <>
-                            <Input
-                              id="feed-bags"
-                              type="number"
-                              placeholder="0"
-                              min={0}
-                              step={0.1}
-                              max={
-                                selectedBatchUsage
-                                  ? selectedBatchUsage.remainingBags
-                                  : undefined
-                              }
-                              value={formData.feedBagsUsed}
-                              className={
-                                feedBagsError || !validateFeedBags()
-                                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                                  : ""
-                              }
-                              onChange={handleFeedBagsChange}
-                              disabled={!formData.feedBatchId}
-                            />
+                      {selectedBatchUsage && (
+                        <p className="text-sm text-muted-foreground">
+                          Maximum available: {selectedBatchUsage.remainingBags}{" "}
+                          bags
+                        </p>
+                      )}
 
-                            {selectedBatchUsage && (
-                              <p className="text-sm text-muted-foreground">
-                                Maximum available:{" "}
-                                {selectedBatchUsage.remainingBags} bags
-                              </p>
-                            )}
-
-                            {feedBagsError && (
-                              <p
-                                role="alert"
-                                className="text-sm text-red-600 font-medium"
-                              >
-                                {feedBagsError}
-                              </p>
-                            )}
-                          </>
-                        );
-                      })()}
+                      {feedBagsError && (
+                        <p
+                          role="alert"
+                          className="text-sm text-red-600 font-medium"
+                        >
+                          {feedBagsError}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -682,9 +467,13 @@ export function DailyEntryForm() {
                   type="submit"
                   className="w-full"
                   size="lg"
-                  disabled={submitting || !isFormValid()}
+                  disabled={
+                    createDailyLogMutation.isPending ||
+                    feedInventoryLoading ||
+                    !isFormValid()
+                  }
                 >
-                  {submitting
+                  {createDailyLogMutation.isPending
                     ? "Submitting..."
                     : !isFormValid()
                       ? feedBagsError

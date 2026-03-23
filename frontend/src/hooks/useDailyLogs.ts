@@ -1,125 +1,122 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getDailyLogs, createDailyLog } from '@/lib/api';
-import { DailyLog, DailyLogPayload, TodaySummary } from '@/types';
-
-export interface DailyLogFilters {
-  date?: string;
-  logDate?: string;
-  houseId?: string;
-}
+import { useMemo } from "react";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  createDailyLog,
+  deleteDailyLog,
+  getDailyLogs,
+  updateDailyLog,
+} from "@/lib/api";
+import {
+  buildTodaySummary,
+  getTodayIsoDate,
+  normalizeDailyLogFilters,
+  type DailyLogFilters,
+} from "@/lib/dailyLogs";
+import { FEED_BATCH_USAGE_STATS_QUERY_KEY } from "@/hooks/useFeedInventory";
+import type { DailyLog, DailyLogPayload, TodaySummary } from "@/types";
 
 export interface UseDailyLogsReturn {
   logs: DailyLog[];
   loading: boolean;
   error: Error | null;
-  refresh: (filters?: DailyLogFilters) => Promise<void>;
-  create: (payload: DailyLogPayload) => Promise<DailyLog | null>;
-  getTodaySummary: () => TodaySummary;
+  refresh: () => Promise<void>;
+  todaySummary: TodaySummary;
   getByDate: (date: string) => DailyLog[];
   getByHouse: (houseId: string) => DailyLog[];
 }
 
-/**
- * Hook for managing daily logs with filtering and summary calculations
- */
+export const DAILY_LOGS_QUERY_KEY = ["daily-logs"] as const;
+
+export function dailyLogsQueryOptions(filters: DailyLogFilters = {}) {
+  const normalizedFilters = normalizeDailyLogFilters(filters);
+
+  return queryOptions({
+    queryKey: [...DAILY_LOGS_QUERY_KEY, normalizedFilters],
+    queryFn: () => getDailyLogs(normalizedFilters),
+  });
+}
+
 export function useDailyLogs(initialFilters?: DailyLogFilters): UseDailyLogsReturn {
-  const [logs, setLogs] = useState<DailyLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
+  const logsQuery = useQuery(dailyLogsQueryOptions(initialFilters));
+  const logs = logsQuery.data ?? [];
 
-  const refresh = useCallback(async (filters: DailyLogFilters = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const filterParams: Record<string, string> = {};
-      if (filters.date) filterParams.date = filters.date;
-      if (filters.logDate) filterParams.logDate = filters.logDate;
-      if (filters.houseId) filterParams.houseId = filters.houseId;
-
-      const data = await getDailyLogs(filterParams);
-      setLogs(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      setLogs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh(initialFilters);
-  }, [refresh, initialFilters]);
-
-  const create = useCallback(
-    async (payload: DailyLogPayload): Promise<DailyLog | null> => {
-      try {
-        const newLog = await createDailyLog(payload);
-        if (newLog) {
-          setLogs((prev) => {
-            // Check if log for same date/house exists and update it
-            const existingIndex = prev.findIndex(
-              (log) => log.logDate === newLog.logDate && log.houseId === newLog.houseId
-            );
-            if (existingIndex >= 0) {
-              const updated = [...prev];
-              updated[existingIndex] = newLog;
-              return updated;
-            }
-            return [...prev, newLog];
-          });
-          return newLog;
-        }
-        return null;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        return null;
-      }
-    },
-    []
-  );
-
-  const getTodaySummary = useCallback((): TodaySummary => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayLogs = logs.filter((log) => log.logDate === today);
-
-    const houseBreakdown = todayLogs.map((log) => ({
-      houseId: log.houseId,
-      houseName: log.House?.houseName || `House ${log.houseId}`,
-      eggs: log.eggsCollected || 0,
-    }));
-
-    return {
-      totalEggs: houseBreakdown.reduce((sum, h) => sum + h.eggs, 0),
-      housesLogged: todayLogs.length,
-      totalHouses: new Set(logs.map((l) => l.houseId)).size,
-      houseBreakdown,
-    };
-  }, [logs]);
-
-  const getByDate = useCallback(
-    (date: string): DailyLog[] => {
-      return logs.filter((log) => log.logDate === date);
-    },
-    [logs]
-  );
-
-  const getByHouse = useCallback(
-    (houseId: string): DailyLog[] => {
-      return logs.filter((log) => String(log.houseId) === String(houseId));
-    },
-    [logs]
+  const todaySummary = useMemo(
+    () =>
+      buildTodaySummary(
+        logs.filter((log) => log.logDate === getTodayIsoDate()),
+        new Set(logs.map((log) => log.houseId)).size,
+      ),
+    [logs],
   );
 
   return {
     logs,
-    loading,
-    error,
-    refresh,
-    create,
-    getTodaySummary,
-    getByDate,
-    getByHouse,
+    loading: logsQuery.isPending,
+    error: logsQuery.error instanceof Error ? logsQuery.error : null,
+    refresh: async () => {
+      await queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY });
+      await logsQuery.refetch();
+    },
+    todaySummary,
+    getByDate: (date: string) => logs.filter((log) => log.logDate === date),
+    getByHouse: (houseId: string) =>
+      logs.filter((log) => String(log.houseId) === String(houseId)),
   };
+}
+
+export function useCreateDailyLog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: DailyLogPayload) => createDailyLog(payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: FEED_BATCH_USAGE_STATS_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateDailyLog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number | string;
+      payload: Partial<DailyLogPayload>;
+    }) => updateDailyLog(id, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: FEED_BATCH_USAGE_STATS_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export function useDeleteDailyLog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number | string) => deleteDailyLog(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY });
+    },
+  });
 }
 
 export default useDailyLogs;

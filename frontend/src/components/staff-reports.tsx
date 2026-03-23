@@ -1,168 +1,40 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Calendar, TrendingUp, Egg, Package, Clock, Award, Target, BarChart3 } from "lucide-react"
-import { getDailyLogs, getWorkAssignments } from "@/lib/api"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { EmptyState } from "@/components/shared/empty-state"
+import { ErrorState } from "@/components/shared/error-state"
 import { PageHeader } from "@/components/shared/page-header"
-
-interface DailyPerformance {
-  day: string;
-  date: string;
-  eggs: number;
-  feed: number;
-  tasks: number;
-  totalTasks: number;
-  efficiency: number;
-}
-
-interface WeeklyStats {
-  eggsCollected: number;
-  feedDistributed: number;
-  tasksCompleted: number;
-  totalTasks: number;
-  avgCollectionTime: string;
-  efficiency: number;
-}
+import { useStaffPerformance } from "@/hooks"
 
 export function StaffReports() {
-  const [loading, setLoading] = useState(true)
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({
+  const { data, isPending, error, refetch } = useStaffPerformance()
+  const weeklyStats = data?.weeklyStats ?? {
     eggsCollected: 0,
     feedDistributed: 0,
     tasksCompleted: 0,
     totalTasks: 0,
     avgCollectionTime: "-",
     efficiency: 0,
-  })
-  const [dailyPerformance, setDailyPerformance] = useState<DailyPerformance[]>([])
+  }
+  const dailyPerformance = data?.dailyPerformance ?? []
 
-  useEffect(() => {
-    async function loadPerformanceData() {
-      setLoading(true)
-      try {
-        // Get dates for this week (Monday to Sunday)
-        const today = new Date()
-        const dayOfWeek = today.getDay()
-        const monday = new Date(today)
-        monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-        const sunday = new Date(monday)
-        sunday.setDate(monday.getDate() + 6)
-
-        const startDate = monday.toISOString().split('T')[0]
-        const endDate = sunday.toISOString().split('T')[0]
-
-        // Fetch daily logs for this week
-        const logs = await getDailyLogs({ startDate, endDate }).catch(() => [])
-        
-        // Fetch work assignments for this week
-        const assignments = await getWorkAssignments().catch(() => [])
-
-        // Group logs by day
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-        const dailyData: Map<string, { eggs: number; feed: number; date: string }> = new Map()
-        
-        // Initialize all days of the week
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(monday)
-          date.setDate(monday.getDate() + i)
-          const dateStr = date.toISOString().split('T')[0]
-          dailyData.set(dateStr, { eggs: 0, feed: 0, date: dateStr })
-        }
-
-        // Aggregate logs by date
-        logs.forEach(log => {
-          const logDate = log.logDate
-          const existing = dailyData.get(logDate)
-          if (existing) {
-            existing.eggs += Number(log.eggsCollected) || 0
-            existing.feed += (Number(log.feedBagsUsed) || 0) * 25 // 25kg per bag
-          }
-        })
-
-        // Calculate tasks per day
-        const tasksByDay: Map<string, { completed: number; total: number }> = new Map()
-        for (let i = 0; i < 7; i++) {
-          const date = new Date(monday)
-          date.setDate(monday.getDate() + i)
-          const dateStr = date.toISOString().split('T')[0]
-          tasksByDay.set(dateStr, { completed: 0, total: 4 }) // Assume 4 tasks per day
-        }
-
-        assignments.forEach(a => {
-          const assignmentDate = (a.date || a.createdAt || '').split('T')[0]
-          const existing = tasksByDay.get(assignmentDate)
-          if (existing) {
-            existing.total++
-            if (a.attendanceStatus === 'present') {
-              existing.completed++
-            }
-          }
-        })
-
-        // Build daily performance array
-        const performance: DailyPerformance[] = []
-        dailyData.forEach((data, dateStr) => {
-          const date = new Date(dateStr)
-          const dayName = dayNames[date.getDay()]
-          const tasks = tasksByDay.get(dateStr) || { completed: 0, total: 4 }
-          
-          // Calculate efficiency based on task completion and production
-          const taskEfficiency = tasks.total > 0 ? (tasks.completed / tasks.total) * 100 : 0
-          
-          performance.push({
-            day: dayName,
-            date: dateStr,
-            eggs: data.eggs,
-            feed: data.feed,
-            tasks: tasks.completed,
-            totalTasks: tasks.total,
-            efficiency: Math.round(taskEfficiency),
-          })
-        })
-
-        // Sort by date (Monday first)
-        performance.sort((a, b) => {
-          const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-          return order.indexOf(a.day) - order.indexOf(b.day)
-        })
-
-        setDailyPerformance(performance)
-
-        // Calculate weekly totals
-        const totalEggs = performance.reduce((sum, d) => sum + d.eggs, 0)
-        const totalFeed = performance.reduce((sum, d) => sum + d.feed, 0)
-        const totalTasksCompleted = performance.reduce((sum, d) => sum + d.tasks, 0)
-        const totalTasksAll = performance.reduce((sum, d) => sum + d.totalTasks, 0)
-        const avgEfficiency = performance.length > 0
-          ? Math.round(performance.reduce((sum, d) => sum + d.efficiency, 0) / performance.length)
-          : 0
-
-        setWeeklyStats({
-          eggsCollected: totalEggs,
-          feedDistributed: totalFeed,
-          tasksCompleted: totalTasksCompleted,
-          totalTasks: totalTasksAll,
-          avgCollectionTime: totalEggs > 0 ? "~45 min" : "-",
-          efficiency: avgEfficiency,
-        })
-
-      } catch (err) {
-        console.error('Failed to load performance data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadPerformanceData()
-  }, [])
-
-  if (loading) {
+  if (isPending) {
     return <LoadingSpinner fullPage message="Loading performance data..." />
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        onRetry={() => {
+          void refetch()
+        }}
+      />
+    )
   }
 
   const hasData = weeklyStats.eggsCollected > 0 || weeklyStats.tasksCompleted > 0

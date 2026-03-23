@@ -1,13 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  getDailyLogs,
-  getHouses,
-  getSales,
-  getLaborers,
-  getEggPriceEstimate,
-} from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -26,224 +18,18 @@ import {
   ArrowUpRight,
   Activity,
 } from "lucide-react";
-import { House } from "@/types";
 import { CardGridSkeleton } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
-
-type Log = {
-  id: string | number;
-  logDate: string;
-  houseId: number | string;
-  eggsCollected: number;
-  feedBagsUsed: number;
-  notes?: string;
-  House?: { houseName?: string };
-};
-
-interface HousePerformance {
-  id: number;
-  name: string;
-  eggs: number;
-  capacity: number;
-  efficiency: number;
-}
+import { useDashboardOverview } from "@/hooks/useDashboardOverview";
+import { EMPTY_DASHBOARD_STATS } from "@/lib/dashboardOverview";
 
 export function DashboardOverview() {
-  const [stats, setStats] = useState({
-    eggsCollected: 0,
-    eggsYesterday: 0,
-    salesAmount: 0,
-    salesYesterday: 0,
-    costPerEgg: 0,
-    costYesterday: 0,
-    activeWorkers: 0,
-    totalWorkers: 0,
-  });
-  const [weeklyData, setWeeklyData] = useState([
-    { day: "Mon", eggs: 0, sales: 0 },
-    { day: "Tue", eggs: 0, sales: 0 },
-    { day: "Wed", eggs: 0, sales: 0 },
-    { day: "Thu", eggs: 0, sales: 0 },
-    { day: "Fri", eggs: 0, sales: 0 },
-    { day: "Sat", eggs: 0, sales: 0 },
-    { day: "Sun", eggs: 0, sales: 0 },
-  ]);
-  const [housePerformance, setHousePerformance] = useState<HousePerformance[]>(
-    [],
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const today = new Date().toISOString().split("T")[0];
-        const yesterday = new Date(Date.now() - 86400000)
-          .toISOString()
-          .split("T")[0];
-
-        // Fetch all data in parallel
-        const [
-          todayLogsRes,
-          yesterdayLogsRes,
-          housesRes,
-          todaySalesRes,
-          yesterdaySalesRes,
-          laborersRes,
-          costEstimateRes,
-        ] = await Promise.all([
-          getDailyLogs({ date: today }),
-          getDailyLogs({ date: yesterday }),
-          getHouses().catch(() => []),
-          getSales({ startDate: today, endDate: today }).catch(() => []),
-          getSales({ startDate: yesterday, endDate: yesterday }).catch(
-            () => [],
-          ),
-          getLaborers().catch(() => []),
-          getEggPriceEstimate(today).catch(() => ({ totalCostPerEgg: 0 })),
-        ]);
-
-        const todayLogs: Log[] = (todayLogsRes as Log[]) || [];
-        const yesterdayLogs: Log[] = (yesterdayLogsRes as Log[]) || [];
-        const houses: House[] = (housesRes as House[]) || [];
-        const todaySales = Array.isArray(todaySalesRes) ? todaySalesRes : [];
-        const yesterdaySales = Array.isArray(yesterdaySalesRes)
-          ? yesterdaySalesRes
-          : [];
-        const laborers = Array.isArray(laborersRes) ? laborersRes : [];
-        const costEstimate =
-          (costEstimateRes as { totalCostPerEgg?: number }) || {};
-
-        const totalEggsToday = todayLogs.reduce(
-          (sum, log) => sum + (Number(log.eggsCollected) || 0),
-          0,
-        );
-        const totalEggsYesterday = yesterdayLogs.reduce(
-          (sum, log) => sum + (Number(log.eggsCollected) || 0),
-          0,
-        );
-
-        // Calculate sales totals
-        const todaySalesTotal = todaySales.reduce(
-          (sum, sale: { totalAmount?: number }) =>
-            sum + (Number(sale.totalAmount) || 0),
-          0,
-        );
-        const yesterdaySalesTotal = yesterdaySales.reduce(
-          (sum, sale: { totalAmount?: number }) =>
-            sum + (Number(sale.totalAmount) || 0),
-          0,
-        );
-
-        // Calculate house performance
-        const housePerf: HousePerformance[] = houses.map((house) => {
-          const houseLogs = todayLogs.filter(
-            (log) => Number(log.houseId) === house.id,
-          );
-          const houseEggs = houseLogs.reduce(
-            (sum, log) => sum + (Number(log.eggsCollected) || 0),
-            0,
-          );
-          const capacity = house.currentBirdCount || house.capacity || 100;
-          // Efficiency is eggs collected / expected production (assuming ~1 egg per bird per day max)
-          const efficiency =
-            capacity > 0
-              ? Math.min(100, Math.round((houseEggs / capacity) * 100))
-              : 0;
-
-          return {
-            id: house.id,
-            name: house.houseName || `House ${house.id}`,
-            eggs: houseEggs,
-            capacity,
-            efficiency,
-          };
-        });
-
-        // Count active laborers
-        const activeLaborers = laborers.filter(
-          (l: { isActive?: boolean }) => l.isActive !== false,
-        ).length;
-
-        // Fetch weekly data (logs and sales in parallel)
-        const weeklyLogPromises = [];
-        const weeklySalesPromises = [];
-        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date(Date.now() - i * 86400000)
-            .toISOString()
-            .split("T")[0];
-          weeklyLogPromises.push(getDailyLogs({ date }));
-          weeklySalesPromises.push(
-            getSales({ startDate: date, endDate: date }).catch(() => []),
-          );
-        }
-
-        const [weeklyLogResults, weeklySalesResults] = await Promise.all([
-          Promise.all(weeklyLogPromises),
-          Promise.all(weeklySalesPromises),
-        ]);
-
-        const newWeeklyData = weeklyLogResults.map((result, index) => {
-          const logs: Log[] = (result as Log[]) || [];
-          const totalEggs = logs.reduce(
-            (sum, log) => sum + (Number(log.eggsCollected) || 0),
-            0,
-          );
-          const dayIndex = new Date(
-            Date.now() - (6 - index) * 86400000,
-          ).getDay();
-
-          // Calculate actual sales for this day
-          const daySales = Array.isArray(weeklySalesResults[index])
-            ? weeklySalesResults[index]
-            : [];
-          const totalSales = daySales.reduce(
-            (sum: number, sale: { totalAmount?: number }) =>
-              sum + (Number(sale.totalAmount) || 0),
-            0,
-          );
-
-          return {
-            day: dayNames[dayIndex],
-            eggs: totalEggs,
-            sales: totalSales,
-          };
-        });
-
-        setStats({
-          eggsCollected: totalEggsToday,
-          eggsYesterday: totalEggsYesterday,
-          salesAmount: todaySalesTotal,
-          salesYesterday: yesterdaySalesTotal,
-          costPerEgg: Number(costEstimate.totalCostPerEgg) || 0,
-          costYesterday: 0, // Would need historical data
-          activeWorkers: activeLaborers,
-          totalWorkers: laborers.length,
-        });
-
-        setHousePerformance(housePerf);
-        setWeeklyData(newWeeklyData);
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("An unknown error occurred");
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
-
-  const todayStats = stats;
+  const { data, error, isLoading, refetch } = useDashboardOverview();
+  const todayStats = data?.stats ?? EMPTY_DASHBOARD_STATS;
+  const weeklyData = data?.weeklyData ?? [];
+  const housePerformance = data?.housePerformance ?? [];
 
   // Helper function to calculate percentage change safely
   const calculatePercentageChange = (
@@ -273,7 +59,7 @@ export function DashboardOverview() {
     ...weeklyData.map((day) => safeNumber(day.sales)),
   );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -291,8 +77,10 @@ export function DashboardOverview() {
         <PageHeader title="Dashboard Overview" />
         <ErrorState
           title="Failed to load dashboard"
-          message={error}
-          onRetry={() => window.location.reload()}
+          message={error instanceof Error ? error.message : "Failed to load dashboard"}
+          onRetry={() => {
+            void refetch();
+          }}
         />
       </div>
     );

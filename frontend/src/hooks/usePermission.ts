@@ -1,7 +1,8 @@
 'use client';
 
 import { useUser } from '@/context/UserContext';
-import { hasPermission, isOwner, isStaff, Resource, PermissionAction } from '@/lib/permissions';
+import { hasPermission, isOwner, isStaff } from '@/lib/permissions';
+import type { Resource, PermissionAction } from '@/lib/permissions';
 
 /**
  * Hook to check if the current user has a specific permission

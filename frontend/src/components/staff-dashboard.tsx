@@ -1,30 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { CheckCircle, Clock, Egg, Package, TrendingUp, Target } from "lucide-react"
 import { useUser } from "@/context/UserContext"
-import { getDailyLogs, getWorkAssignments } from "@/lib/api"
 import { LoadingSpinner } from "@/components/shared/loading-spinner"
 import { EmptyState } from "@/components/shared/empty-state"
+import { ErrorState } from "@/components/shared/error-state"
 import { PageHeader } from "@/components/shared/page-header"
-
-interface TaskItem {
-  id: number;
-  task: string;
-  status: 'completed' | 'pending' | 'in-progress';
-  time: string;
-}
-
-interface DailyStats {
-  eggsCollected: number;
-  feedBagsUsed: number;
-  tasksCompleted: number;
-  totalTasks: number;
-}
+import { useStaffDashboardOverview } from "@/hooks"
 
 interface StaffDashboardProps {
   onNavigate?: (tab: string) => void;
@@ -32,16 +18,14 @@ interface StaffDashboardProps {
 
 export function StaffDashboard({ onNavigate }: StaffDashboardProps) {
   const { user } = useUser()
-  const [loading, setLoading] = useState(true)
-  const [todaysTasks, setTodaysTasks] = useState<TaskItem[]>([])
-  const [stats, setStats] = useState<DailyStats>({
+  const { data, isPending, error, refetch } = useStaffDashboardOverview()
+  const todaysTasks = data?.todaysTasks ?? []
+  const stats = data?.stats ?? {
     eggsCollected: 0,
     feedBagsUsed: 0,
     tasksCompleted: 0,
     totalTasks: 0,
-  })
-
-  const today = new Date().toISOString().split('T')[0]
+  }
   
   // Get greeting based on time
   const getGreeting = () => {
@@ -51,55 +35,19 @@ export function StaffDashboard({ onNavigate }: StaffDashboardProps) {
     return "Good evening"
   }
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      setLoading(true)
-      try {
-        // Load today's daily logs for production stats
-        const logs = await getDailyLogs({ date: today }).catch(() => [])
-        
-        // Calculate today's stats from logs
-        const todayEggs = logs.reduce((sum, log) => sum + (Number(log.eggsCollected) || 0), 0)
-        const todayFeedBags = logs.reduce((sum, log) => sum + (Number(log.feedBagsUsed) || 0), 0)
-        
-        // Load work assignments for tasks
-        const assignments = await getWorkAssignments().catch(() => [])
-        
-        // Filter today's tasks
-        const todayAssignments = assignments.filter(a => {
-          const assignmentDate = a.date || a.createdAt
-          return assignmentDate?.startsWith(today)
-        })
-        
-        // Map assignments to task items
-        const tasks: TaskItem[] = todayAssignments.map(a => ({
-          id: a.id,
-          task: a.tasksAssigned?.join(', ') || a.performanceNotes || 'Assigned task',
-          status: a.attendanceStatus === 'present' ? 'completed' : a.attendanceStatus === 'late' ? 'in-progress' : 'pending',
-          time: a.hours ? `${a.hours} hours` : 'Anytime',
-        }))
-        
-        const completedTasks = tasks.filter(t => t.status === 'completed').length
-        
-        setTodaysTasks(tasks)
-        setStats({
-          eggsCollected: todayEggs,
-          feedBagsUsed: todayFeedBags,
-          tasksCompleted: completedTasks,
-          totalTasks: tasks.length,
-        })
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    loadDashboardData()
-  }, [today])
-
-  if (loading) {
+  if (isPending) {
     return <LoadingSpinner fullPage message="Loading dashboard..." />
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        onRetry={() => {
+          void refetch()
+        }}
+      />
+    )
   }
 
   const taskProgress = stats.totalTasks > 0 ? (stats.tasksCompleted / stats.totalTasks) * 100 : 0

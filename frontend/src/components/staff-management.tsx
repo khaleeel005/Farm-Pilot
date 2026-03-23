@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { listStaff, createStaff, deleteStaff, ApiError } from "@/lib/api";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,97 +49,72 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  useResourcePermissions,
+  useStaffMembers,
+  useToastContext,
+} from "@/hooks";
+import {
+  buildCreateStaffPayload,
+  buildStaffSummary,
+  createEmptyStaffForm,
+  filterStaffMembers,
+  getStaffDisplayName,
+  getStaffInitials,
+} from "@/lib/staffManagement";
 
 export function StaffManagement() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  type Staff = {
-    id: number;
-    username?: string;
-    name?: string;
-    role?: string;
-    department?: string;
-    email?: string;
-    phone?: string;
-    salary?: string;
-    status?: string;
-    performance?: number;
-    workersSupervised?: number;
-    avatar?: string;
-  };
-
-  const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
-
-  const loadStaff = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await listStaff();
-      if (res) {
-        const data =
-          (res as { data?: Staff[] })?.data || (Array.isArray(res) ? res : []);
-        setStaffMembers(data);
-      }
-    } catch (err) {
-      console.error("Failed to load staff", err);
-      if (err instanceof ApiError) {
-        if (err.isForbidden) {
-          setError(
-            "You do not have permission to manage staff. Only owners can access this feature.",
-          );
-        } else if (err.isUnauthorized) {
-          setError("Please log in to access staff management.");
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError("Failed to load staff members. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadStaff();
-  }, [loadStaff]);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
-  const [newStaff, setNewStaff] = useState({ username: "", password: "" });
+  const [newStaff, setNewStaff] = useState(createEmptyStaffForm());
+  const {
+    staffMembers,
+    loading,
+    error,
+    refresh,
+    create,
+    remove,
+    isMutating,
+  } = useStaffMembers();
+  const { canCreate, canDelete } = useResourcePermissions("STAFF");
+  const toast = useToastContext();
 
-  // staffMembers state is populated from the backend API
-
-  const filteredStaff = staffMembers.filter((staff) => {
-    const matchesSearch = (staff.name || staff.username || staff.email || "")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
-
-  // computed stats
-  const totalStaff = staffMembers.length;
-  const activeStaff = staffMembers.filter(
-    (s) => (s.status || "active") === "active",
-  ).length;
-  const inactiveStaff = Math.max(totalStaff - activeStaff, 0);
-  const perfValues = staffMembers
-    .map((s) => s.performance)
-    .filter((p) => typeof p === "number") as number[];
-  const avgPerformance = perfValues.length
-    ? Math.round(perfValues.reduce((a, b) => a + b, 0) / perfValues.length)
-    : 0;
-  const parseSalary = (v?: string) => {
-    if (!v) return 0;
-    const digits = String(v).replace(/[^0-9.]/g, "");
-    const n = parseFloat(digits || "0");
-    return Number.isFinite(n) ? n : 0;
-  };
-  const totalPayroll = staffMembers.reduce(
-    (s, m) => s + parseSalary(m.salary),
-    0,
+  const filteredStaff = useMemo(
+    () => filterStaffMembers(staffMembers, searchTerm),
+    [searchTerm, staffMembers],
   );
-  const payrollRecords = staffMembers.filter((m) => parseSalary(m.salary) > 0).length;
+  const summary = useMemo(() => buildStaffSummary(staffMembers), [staffMembers]);
+
+  const handleCreate = async () => {
+    if (!newStaff.username.trim()) {
+      toast.error("Username is required");
+      return;
+    }
+
+    try {
+      await create(buildCreateStaffPayload(newStaff));
+      setIsAddStaffOpen(false);
+      setNewStaff(createEmptyStaffForm());
+      toast.success("Staff member added");
+    } catch (creationError) {
+      console.error("Failed to create staff", creationError);
+      toast.error("Failed to create staff member");
+    }
+  };
+
+  const handleDelete = async (staffId: number) => {
+    if (!confirm("Delete this staff member?")) {
+      return;
+    }
+
+    try {
+      await remove(staffId);
+      toast.success("Staff member deleted");
+    } catch (deletionError) {
+      console.error("Failed to delete staff", deletionError);
+      toast.error("Failed to delete staff member");
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner fullPage message="Loading staff members..." />;
@@ -150,131 +124,112 @@ export function StaffManagement() {
     return (
       <ErrorState
         title="Unable to load staff"
-        message={error}
-        onRetry={loadStaff}
+        message={error.message}
+        onRetry={() => {
+          void refresh();
+        }}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <PageHeader
         eyebrow="People Ops"
         title="Staff Management"
         description="Manage your farm supervisors and staff members"
         actions={
-          <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Staff Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[620px]">
-            <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
-              <DialogDescription>
-                Add a new staff member to your farm team.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-                  Step 1
-                </p>
-                <h3 className="display-heading text-2xl">Account Basics</h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      value={newStaff.username}
-                      onChange={(e) =>
-                        setNewStaff((s) => ({ ...s, username: e.target.value }))
-                      }
-                    />
+          canCreate ? (
+            <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Staff Member
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[620px]">
+                <DialogHeader>
+                  <DialogTitle>Add New Staff Member</DialogTitle>
+                  <DialogDescription>
+                    Add a new staff member to your farm team.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                      Step 1
+                    </p>
+                    <h3 className="display-heading text-2xl">Account Basics</h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="username">Username</Label>
+                        <Input
+                          id="username"
+                          value={newStaff.username}
+                          onChange={(event) =>
+                            setNewStaff((current) => ({
+                              ...current,
+                              username: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={newStaff.password}
+                          onChange={(event) =>
+                            setNewStaff((current) => ({
+                              ...current,
+                              password: event.target.value,
+                            }))
+                          }
+                          placeholder="Defaults to changeme"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={newStaff.password}
-                      onChange={(e) =>
-                        setNewStaff((s) => ({ ...s, password: e.target.value }))
-                      }
-                      placeholder="Defaults to changeme"
-                    />
+
+                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+                      Step 2
+                    </p>
+                    <h3 className="display-heading text-2xl">Role Metadata</h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="department">Department</Label>
+                      <Select>
+                        <SelectTrigger id="department">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="production">Production</SelectItem>
+                          <SelectItem value="feed">Feed</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
+                          <SelectItem value="sales">Sales</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-                  Step 2
-                </p>
-                <h3 className="display-heading text-2xl">Role Metadata</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="production">Production</SelectItem>
-                      <SelectItem value="feed">Feed</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="sales">Sales</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddStaffOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button disabled={isMutating} onClick={handleCreate}>
+                    Add Staff Member
+                  </Button>
                 </div>
-              </div>
-
-              {/* <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="phone" className="text-right">
-                  Phone
-                </Label>
-                <Input id="phone" className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="salary" className="text-right">
-                  Salary
-                </Label>
-                <Input id="salary" placeholder="₦150,000" className="col-span-3" />
-              </div> */}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsAddStaffOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={async () => {
-                  try {
-                    await createStaff({
-                      username: newStaff.username,
-                      password: newStaff.password || "changeme",
-                    });
-                    setIsAddStaffOpen(false);
-                    setNewStaff({ username: "", password: "" });
-                    await loadStaff();
-                  } catch (err) {
-                    console.error("Failed to create staff", err);
-                  }
-                }}
-              >
-                Add Staff Member
-              </Button>
-            </div>
-          </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          ) : null
         }
       />
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -284,9 +239,12 @@ export function StaffManagement() {
             <UserCheck className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="display-heading text-3xl leading-none">{totalStaff}</div>
+            <div className="display-heading text-3xl leading-none">
+              {summary.totalStaff}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {activeStaff} active member{activeStaff !== 1 ? "s" : ""}
+              {summary.activeStaff} active member
+              {summary.activeStaff !== 1 ? "s" : ""}
             </p>
           </CardContent>
         </Card>
@@ -298,9 +256,12 @@ export function StaffManagement() {
             <Clock className="h-4 w-4 text-muted-foreground hidden sm:block" />
           </CardHeader>
           <CardContent>
-            <div className="display-heading text-3xl leading-none">{activeStaff}</div>
+            <div className="display-heading text-3xl leading-none">
+              {summary.activeStaff}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {inactiveStaff} inactive member{inactiveStaff !== 1 ? "s" : ""}
+              {summary.inactiveStaff} inactive member
+              {summary.inactiveStaff !== 1 ? "s" : ""}
             </p>
           </CardContent>
         </Card>
@@ -313,11 +274,11 @@ export function StaffManagement() {
           </CardHeader>
           <CardContent>
             <div className="display-heading text-3xl leading-none">
-              {avgPerformance}%
+              {summary.avgPerformance}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {perfValues.length > 0
-                ? `Based on ${perfValues.length} performance record${perfValues.length !== 1 ? "s" : ""}`
+              {summary.performanceRecordCount > 0
+                ? `Based on ${summary.performanceRecordCount} performance record${summary.performanceRecordCount !== 1 ? "s" : ""}`
                 : "No performance records yet"}
             </p>
           </CardContent>
@@ -331,30 +292,28 @@ export function StaffManagement() {
           </CardHeader>
           <CardContent>
             <div className="display-heading text-3xl leading-none truncate">
-              {formatCurrency(totalPayroll)}
+              {formatCurrency(summary.totalPayroll)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {payrollRecords} salary record{payrollRecords !== 1 ? "s" : ""}
+              {summary.payrollRecords} salary record
+              {summary.payrollRecords !== 1 ? "s" : ""}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search staff members..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(event) => setSearchTerm(event.target.value)}
             className="pl-8"
           />
         </div>
-        {/* department filter removed - simple create/delete UI for now */}
       </div>
 
-      {/* Staff Table */}
       <Card>
         <CardHeader>
           <CardTitle className="display-heading text-2xl">Staff Members</CardTitle>
@@ -389,18 +348,15 @@ export function StaffManagement() {
                         <Avatar className="h-8 w-8">
                           <AvatarImage
                             src={staff.avatar || "/placeholder.svg"}
-                            alt={staff.name || staff.username}
+                            alt={getStaffDisplayName(staff)}
                           />
                           <AvatarFallback>
-                            {(staff.name || staff.username || "")
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
+                            {getStaffInitials(staff)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-medium">
-                            {staff.username || staff.name}
+                            {getStaffDisplayName(staff)}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             {staff.role}
@@ -411,21 +367,18 @@ export function StaffManagement() {
 
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={async () => {
-                            if (!confirm("Delete this staff member?")) return;
-                            try {
-                              await deleteStaff(staff.id);
-                              await loadStaff();
-                            } catch (err) {
-                              console.error("Failed to delete staff", err);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                        </Button>
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isMutating}
+                            onClick={() => {
+                              void handleDelete(staff.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

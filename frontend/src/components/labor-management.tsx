@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -32,26 +32,38 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
+import type { Laborer } from "@/types";
 import {
-  getLaborers,
-  createLaborer,
-  deleteLaborer,
-  getPayrollMonth,
-} from "@/lib/api";
-import type { Laborer, Payroll } from "@/types";
-import { useResourcePermissions, useToastContext } from "@/hooks";
+  useLaborers,
+  usePayrollMonth,
+  useResourcePermissions,
+  useToastContext,
+} from "@/hooks";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 
 export function LaborManagement() {
+  const monthYear = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const [showNewWorker, setShowNewWorker] = useState(false);
   const [deleteConfirmWorker, setDeleteConfirmWorker] =
     useState<Laborer | null>(null);
-
-  const [workers, setWorkers] = useState<Laborer[]>([]);
-  const [payroll, setPayroll] = useState<Payroll[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    laborers: workers,
+    loading: workersLoading,
+    error: workersError,
+    refresh: refreshLaborers,
+    create,
+    remove,
+    isMutating,
+  } = useLaborers();
+  const {
+    payroll,
+    loading: payrollLoading,
+    error: payrollError,
+    refresh: refreshPayroll,
+  } = usePayrollMonth(monthYear);
 
   // Permission checks
   const { canCreate, canDelete } = useResourcePermissions("LABORERS");
@@ -73,9 +85,8 @@ export function LaborManagement() {
       monthlySalary: Number(salary) || 0,
     };
     try {
-      const created = await createLaborer(payload);
+      const created = await create(payload);
       if (created) {
-        setWorkers((cur) => [created, ...cur]);
         setShowNewWorker(false);
         setFullName("");
         setPhone("");
@@ -90,43 +101,38 @@ export function LaborManagement() {
 
   const handleDelete = async (id: string | number) => {
     try {
-      const ok = await deleteLaborer(id);
-      if (ok) {
-        setWorkers((cur) => cur.filter((w) => String(w.id) !== String(id)));
-        toast.success("Worker deleted");
-        setDeleteConfirmWorker(null);
-      }
+      await remove(id);
+      toast.success("Worker deleted");
+      setDeleteConfirmWorker(null);
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete worker");
     }
   };
+  const payrollData = payroll;
+  const error = workersError || payrollError;
 
-  useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      try {
-        const ws = await getLaborers();
-        setWorkers(ws || []);
-      } catch (err) {
-        console.error("Failed to load laborers", err);
-      }
-
-      try {
-        const p = await getPayrollMonth(new Date().toISOString().slice(0, 7));
-        setPayroll(p || []);
-      } catch (err) {
-        console.error("Failed to load payroll", err);
-      }
-      setIsLoading(false);
-    }
-    load();
-  }, []);
-
-  const payrollData = payroll.length ? payroll : [];
-
-  if (isLoading) {
+  if (workersLoading || payrollLoading) {
     return <LoadingSpinner fullPage message="Loading labor data..." />;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Workforce"
+          title="Labor Management"
+          description="Manage workers, attendance, and payroll"
+        />
+        <ErrorState
+          title="Failed to load labor data"
+          message={error.message}
+          onRetry={() => {
+            void Promise.all([refreshLaborers(), refreshPayroll()]);
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -197,7 +203,11 @@ export function LaborManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button className="flex-1 sm:flex-none" onClick={handleCreate}>
+            <Button
+              className="flex-1 sm:flex-none"
+              onClick={handleCreate}
+              disabled={isMutating}
+            >
               Add Worker
             </Button>
             <DialogClose asChild>
@@ -233,6 +243,7 @@ export function LaborManagement() {
               onClick={() =>
                 deleteConfirmWorker && handleDelete(deleteConfirmWorker.id)
               }
+              disabled={isMutating}
             >
               Delete
             </Button>

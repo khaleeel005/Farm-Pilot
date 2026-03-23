@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -30,7 +29,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import {
   Receipt,
   Plus,
@@ -40,6 +39,19 @@ import {
 } from "lucide-react";
 import { getCostTypes, getCostEntries, createCostEntry } from "@/lib/api";
 import formatCurrency from "@/lib/format";
+import {
+  buildExpenseExportCsv,
+  calculateExpenseMetrics,
+  createEmptyCostEntry,
+  extractCostEntries,
+  extractCostTypes,
+  filterExpenseEntries,
+  getCurrentMonthRange,
+  mapExpenseEntry,
+  type ExpenseCategory,
+  type ExpenseMetrics,
+  type ExpenseRecord,
+} from "@/lib/expenseManagement";
 import type { CostEntry, CostTypeOption } from "@/types/entities/cost";
 import { useToastContext } from "@/hooks";
 import { PageHeader } from "@/components/shared/page-header";
@@ -48,67 +60,40 @@ interface ExpenseManagementProps {
   userRole?: "owner" | "staff";
 }
 
+const CATEGORY_OPTIONS: Array<{
+  value: ExpenseCategory;
+  label: string;
+}> = [
+  { value: "all", label: "All categories" },
+  { value: "operational", label: "Operational" },
+  { value: "capital", label: "Capital" },
+  { value: "emergency", label: "Emergency" },
+];
+
 export function ExpenseManagement({
   userRole = "owner",
 }: ExpenseManagementProps) {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<
-    "all" | "operational" | "capital" | "emergency"
-  >("all");
+  const [categoryFilter, setCategoryFilter] =
+    useState<ExpenseCategory>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
   const [costTypes, setCostTypes] = useState<CostTypeOption[]>([]);
-  const [newCostEntry, setNewCostEntry] = useState<Partial<CostEntry>>({
-    date: new Date().toISOString().split("T")[0],
-    costType: undefined,
-    description: "",
-    amount: 0,
-    category: "operational",
-  });
+  const [newCostEntry, setNewCostEntry] = useState<Partial<CostEntry>>(
+    createEmptyCostEntry,
+  );
   const toast = useToastContext();
 
-  // Calculate current month date range
-  const currentMonthRange = useMemo(() => {
-    const now = new Date();
-    const start = startOfMonth(now);
-    const end = endOfMonth(now);
-    return {
-      startDate: format(start, "yyyy-MM-dd"),
-      endDate: format(end, "yyyy-MM-dd"),
-      daysElapsed: differenceInDays(now, start) + 1, // +1 to include today
-    };
+  const currentMonthRange = useMemo(() => getCurrentMonthRange(), []);
+
+  const updateNewCostEntry = useCallback((updates: Partial<CostEntry>) => {
+    setNewCostEntry((prev) => ({ ...prev, ...updates }));
   }, []);
 
-  const handleCreateCostEntry = async () => {
-    try {
-      setLoading(true);
-      const payload = {
-        ...newCostEntry,
-      };
-      const result = await createCostEntry(payload as Partial<CostEntry>);
-      if (result) {
-        // success response contains created cost entry
-        setIsAddExpenseOpen(false);
-        await loadCostData();
-        toast.success("Cost entry added successfully.");
-        setNewCostEntry({
-          date: new Date().toISOString().split("T")[0],
-          costType: undefined,
-          description: "",
-          amount: 0,
-          category: "operational",
-        });
-      } else {
-        toast.error("Failed to add cost entry.");
-      }
-    } catch (error) {
-      console.error("Failed to create cost entry:", error);
-      toast.error("Failed to add cost entry.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const resetNewCostEntry = useCallback(() => {
+    setNewCostEntry(createEmptyCostEntry());
+  }, []);
 
   const loadCostData = useCallback(async () => {
     try {
@@ -121,38 +106,8 @@ export function ExpenseManagement({
         }),
       ]);
 
-      if (typesRes) {
-        // API returns { success, data: [...] }
-        const response = typesRes as { data?: CostTypeOption[] };
-        const typesData =
-          response?.data || (Array.isArray(typesRes) ? typesRes : []);
-        setCostTypes(Array.isArray(typesData) ? typesData : []);
-      }
-
-      if (entriesRes) {
-        // API returns { success, data: { costEntries, pagination } }
-        type EntriesResponse = {
-          data?: { costEntries?: CostEntry[] };
-          costEntries?: CostEntry[];
-        };
-        const response = entriesRes as EntriesResponse;
-
-        let entries: CostEntry[] = [];
-        if (
-          response?.data?.costEntries &&
-          Array.isArray(response.data.costEntries)
-        ) {
-          entries = response.data.costEntries;
-        } else if (
-          response?.costEntries &&
-          Array.isArray(response.costEntries)
-        ) {
-          entries = response.costEntries;
-        } else if (Array.isArray(entriesRes)) {
-          entries = entriesRes as CostEntry[];
-        }
-        setCostEntries(entries);
-      }
+      setCostTypes(extractCostTypes(typesRes));
+      setCostEntries(extractCostEntries(entriesRes));
     } catch (error) {
       console.error("Failed to load cost data:", error);
       setCostEntries([]);
@@ -161,115 +116,65 @@ export function ExpenseManagement({
     } finally {
       setLoading(false);
     }
-  }, [currentMonthRange.startDate, currentMonthRange.endDate, toast]);
+  }, [currentMonthRange.endDate, currentMonthRange.startDate, toast]);
 
   useEffect(() => {
-    loadCostData();
+    void loadCostData();
   }, [loadCostData]);
 
-  const filteredExpenses = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return costEntries.filter((entry) => {
-      const matchesCategory =
-        categoryFilter === "all" || entry.category === categoryFilter;
-      const searchHaystack = [
-        entry.description,
-        entry.costType,
-        entry.vendor,
-        entry.creator?.username,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const matchesSearch = !term || searchHaystack.includes(term);
+  const handleCreateCostEntry = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await createCostEntry(newCostEntry as Partial<CostEntry>);
 
-      return matchesCategory && matchesSearch;
-    });
-  }, [costEntries, categoryFilter, searchTerm]);
+      if (!result) {
+        toast.error("Failed to add cost entry.");
+        return;
+      }
 
-  const expenses = filteredExpenses.map((entry) => ({
-    id: entry.id,
-    date: entry.date,
-    category: entry.category || entry.costType,
-    description: entry.description,
-    amount: entry.amount,
-    status:
-      entry.receiptNumber && entry.vendor
-        ? "verified"
-        : entry.receiptNumber || entry.vendor || entry.notes
-          ? "documented"
-          : "recorded",
-    submittedBy: entry.creator?.username || "Unknown",
-    receipt: entry.receiptNumber || null,
-    vendor: entry.vendor || null,
-  }));
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "verified":
-        return (
-          <Badge className="border-transparent bg-success text-success-foreground">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Verified
-          </Badge>
-        );
-      case "documented":
-        return (
-          <Badge variant="secondary">
-            Documented
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">Recorded</Badge>;
+      setIsAddExpenseOpen(false);
+      resetNewCostEntry();
+      await loadCostData();
+      toast.success("Cost entry added successfully.");
+    } catch (error) {
+      console.error("Failed to create cost entry:", error);
+      toast.error("Failed to add cost entry.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [loadCostData, newCostEntry, resetNewCostEntry, toast]);
 
-  const totalExpenses = filteredExpenses.reduce(
-    (s, e) => s + (Number(e.amount) || 0),
-    0,
+  const filteredExpenses = useMemo(
+    () => filterExpenseEntries(costEntries, categoryFilter, searchTerm),
+    [categoryFilter, costEntries, searchTerm],
   );
-  const verifiedExpenses = expenses.filter((e) => e.status === "verified").length;
-  const documentedExpenses = expenses.filter(
-    (e) => e.status === "documented",
-  ).length;
-  const exportedRows = expenses.length;
 
-  const handleExport = () => {
+  const expenses = useMemo(
+    () => filteredExpenses.map(mapExpenseEntry),
+    [filteredExpenses],
+  );
+
+  const expenseMetrics = useMemo(
+    () =>
+      calculateExpenseMetrics(
+        filteredExpenses,
+        expenses,
+        currentMonthRange.daysElapsed,
+      ),
+    [currentMonthRange.daysElapsed, expenses, filteredExpenses],
+  );
+
+  const handleExport = useCallback(() => {
     if (expenses.length === 0) {
       toast.error("No expenses available to export.");
       return;
     }
 
-    const headers = [
-      "Date",
-      "Category",
-      "Description",
-      "Amount",
-      "Submitted By",
-      "Status",
-      "Receipt Number",
-      "Vendor",
-    ];
-
-    const csvRows = expenses.map((expense) =>
-      [
-        expense.date,
-        expense.category,
-        expense.description,
-        Number(expense.amount || 0).toFixed(2),
-        expense.submittedBy,
-        expense.status,
-        expense.receipt || "",
-        expense.vendor || "",
-      ]
-        .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-        .join(","),
-    );
-
-    const csv = [headers.join(","), ...csvRows].join("\n");
+    const csv = buildExpenseExportCsv(expenses);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `expenses-${currentMonthRange.startDate}-to-${currentMonthRange.endDate}.csv`;
     document.body.appendChild(link);
@@ -277,365 +182,447 @@ export function ExpenseManagement({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     toast.success("Expense export downloaded.");
-  };
+  }, [
+    currentMonthRange.endDate,
+    currentMonthRange.startDate,
+    expenses,
+    toast,
+  ]);
+
+  if (loading && costEntries.length === 0 && costTypes.length === 0) {
+    return <ExpenseLoadingState />;
+  }
 
   return (
     <div className="space-y-6">
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading cost data...</p>
+      <PageHeader
+        eyebrow="Cost Ledger"
+        title={userRole === "staff" ? "Log Expenses" : "Expense Management"}
+        description={
+          userRole === "staff"
+            ? "Record and track farm expenses"
+            : "Track and manage all farm expenses"
+        }
+        actions={
+          <AddExpenseDialog
+            costTypes={costTypes}
+            loading={loading}
+            newCostEntry={newCostEntry}
+            open={isAddExpenseOpen}
+            onEntryChange={updateNewCostEntry}
+            onOpenChange={setIsAddExpenseOpen}
+            onSubmit={handleCreateCostEntry}
+          />
+        }
+      />
+
+      <ExpenseStatsCards
+        daysElapsed={currentMonthRange.daysElapsed}
+        metrics={expenseMetrics}
+        userRole={userRole}
+      />
+
+      <ExpenseListCard
+        categoryFilter={categoryFilter}
+        expenses={expenses}
+        exportedRows={expenseMetrics.exportedRows}
+        searchTerm={searchTerm}
+        userRole={userRole}
+        onCategoryChange={setCategoryFilter}
+        onExport={handleExport}
+        onSearchTermChange={setSearchTerm}
+      />
+    </div>
+  );
+}
+
+function ExpenseLoadingState() {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <div className="text-center">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-muted-foreground">Loading cost data...</p>
+      </div>
+    </div>
+  );
+}
+
+interface AddExpenseDialogProps {
+  costTypes: CostTypeOption[];
+  loading: boolean;
+  newCostEntry: Partial<CostEntry>;
+  open: boolean;
+  onEntryChange: (updates: Partial<CostEntry>) => void;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: () => void;
+}
+
+function AddExpenseDialog({
+  costTypes,
+  loading,
+  newCostEntry,
+  open,
+  onEntryChange,
+  onOpenChange,
+  onSubmit,
+}: AddExpenseDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Operating Cost
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Add Expense</DialogTitle>
+          <DialogDescription>
+            Add a single expense line (pick a type, enter amount and
+            description).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 py-2">
+          <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+              Step 1
+            </p>
+            <h3 className="display-heading text-2xl">Expense Details</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newCostEntry.date || ""}
+                  onChange={(e) => onEntryChange({ date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="costType">Cost Type</Label>
+                <select
+                  id="costType"
+                  className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
+                  value={newCostEntry.costType || ""}
+                  onChange={(e) =>
+                    onEntryChange({
+                      costType: e.target.value as CostEntry["costType"],
+                    })
+                  }
+                >
+                  <option value="">Select cost type</option>
+                  {costTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  value={newCostEntry.description || ""}
+                  onChange={(e) =>
+                    onEntryChange({ description: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="amount">Amount (₦)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={newCostEntry.amount || 0}
+                  onChange={(e) =>
+                    onEntryChange({
+                      amount: Number.parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="category">Category</Label>
+                <select
+                  id="category"
+                  className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
+                  value={newCostEntry.category || "operational"}
+                  onChange={(e) =>
+                    onEntryChange({
+                      category: e.target.value as NonNullable<
+                        CostEntry["category"]
+                      >,
+                    })
+                  }
+                >
+                  <option value="operational">Operational</option>
+                  <option value="capital">Capital</option>
+                  <option value="emergency">Emergency</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+              Step 2
+            </p>
+            <h3 className="display-heading text-2xl">Optional Metadata</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="vendor">Vendor (optional)</Label>
+                <Input
+                  id="vendor"
+                  value={newCostEntry.vendor || ""}
+                  onChange={(e) => onEntryChange({ vendor: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Input
+                  id="notes"
+                  value={newCostEntry.notes || ""}
+                  onChange={(e) => onEntryChange({ notes: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
         </div>
-      ) : (
-        <>
-          <PageHeader
-            eyebrow="Cost Ledger"
-            title={userRole === "staff" ? "Log Expenses" : "Expense Management"}
-            description={
-              userRole === "staff"
-                ? "Record and track farm expenses"
-                : "Track and manage all farm expenses"
-            }
-            actions={
-              <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Operating Cost
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[85vh] sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Add Expense</DialogTitle>
-                  <DialogDescription>
-                    Add a single expense line (pick a type, enter amount and
-                    description).
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-5 py-2">
-                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-                      Step 1
-                    </p>
-                    <h3 className="display-heading text-2xl">Expense Details</h3>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="grid gap-2">
-                        <Label htmlFor="date">Date</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={newCostEntry.date || ""}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              date: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="costType">Cost Type</Label>
-                        <select
-                          id="costType"
-                          className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
-                          value={newCostEntry.costType || ""}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              costType: e.target
-                                .value as unknown as CostEntry["costType"],
-                            }))
-                          }
-                        >
-                          <option value="">Select cost type</option>
-                          {costTypes.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Input
-                          id="description"
-                          value={newCostEntry.description || ""}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              description: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="amount">Amount (₦)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          value={newCostEntry.amount || 0}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              amount: parseFloat(e.target.value) || 0,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="category">Category</Label>
-                        <select
-                          id="category"
-                          className="h-10 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm"
-                          value={newCostEntry.category || "operational"}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              category: e.target.value as
-                                | "operational"
-                                | "capital"
-                                | "emergency",
-                            }))
-                          }
-                        >
-                          <option value="operational">Operational</option>
-                          <option value="capital">Capital</option>
-                          <option value="emergency">Emergency</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-                      Step 2
-                    </p>
-                    <h3 className="display-heading text-2xl">Optional Metadata</h3>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="grid gap-2">
-                        <Label htmlFor="vendor">Vendor (optional)</Label>
-                        <Input
-                          id="vendor"
-                          value={newCostEntry.vendor || ""}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              vendor: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="notes">Notes (optional)</Label>
-                        <Input
-                          id="notes"
-                          value={newCostEntry.notes || ""}
-                          onChange={(e) =>
-                            setNewCostEntry((prev) => ({
-                              ...prev,
-                              notes: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsAddExpenseOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateCostEntry} disabled={loading}>
-                    {loading ? "Adding..." : "Add Expense"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-              </Dialog>
-            }
-          />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={loading}>
+            {loading ? "Adding..." : "Add Expense"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">
-                  Total Expenses
-                </CardTitle>
-                <Receipt className="h-4 w-4 text-muted-foreground hidden sm:block" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold truncate">
-                  {new Intl.NumberFormat("en-NG", {
-                    style: "currency",
-                    currency: "NGN",
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  }).format(totalExpenses)}
-                </div>
-                <p className="text-xs text-muted-foreground">This month</p>
-              </CardContent>
-            </Card>
+interface ExpenseStatsCardsProps {
+  daysElapsed: number;
+  metrics: ExpenseMetrics;
+  userRole: "owner" | "staff";
+}
 
-            {userRole === "owner" && (
-              <>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">
-                      Verified
-                    </CardTitle>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground hidden sm:block" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">
-                      {verifiedExpenses}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Includes receipt + vendor
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">
-                      Documented
-                    </CardTitle>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground hidden sm:block" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">
-                      {documentedExpenses}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Vendor, note, or receipt attached
-                    </p>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">
-                  Avg Daily
-                </CardTitle>
-                <AlertCircle className="h-4 w-4 text-muted-foreground hidden sm:block" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold truncate">
-                  {new Intl.NumberFormat("en-NG", {
-                    style: "currency",
-                    currency: "NGN",
-                    maximumFractionDigits: 0,
-                  }).format(
-                    Math.round(totalExpenses / currentMonthRange.daysElapsed),
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Based on {currentMonthRange.daysElapsed} days this month
-                </p>
-              </CardContent>
-            </Card>
+function ExpenseStatsCards({
+  daysElapsed,
+  metrics,
+  userRole,
+}: ExpenseStatsCardsProps) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xs font-medium sm:text-sm">
+            Total Expenses
+          </CardTitle>
+          <Receipt className="hidden h-4 w-4 text-muted-foreground sm:block" />
+        </CardHeader>
+        <CardContent>
+          <div className="truncate text-lg font-bold sm:text-2xl">
+            {formatCompactCurrency(metrics.totalExpenses)}
           </div>
+          <p className="text-xs text-muted-foreground">This month</p>
+        </CardContent>
+      </Card>
 
-          {/* Expense List */}
+      {userRole === "owner" && (
+        <>
           <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="display-heading text-2xl">
-                    Recent Expenses
-                  </CardTitle>
-                  <CardDescription>
-                    {userRole === "staff"
-                      ? "Your submitted expenses and their documentation quality"
-                      : "All farm expenses with searchable records"}
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                    value={categoryFilter}
-                    onChange={(e) =>
-                      setCategoryFilter(
-                        e.target.value as
-                          | "all"
-                          | "operational"
-                          | "capital"
-                          | "emergency",
-                      )
-                    }
-                  >
-                    <option value="all">All categories</option>
-                    <option value="operational">Operational</option>
-                    <option value="capital">Capital</option>
-                    <option value="emergency">Emergency</option>
-                  </select>
-                  <Input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search description, type, vendor..."
-                    className="h-9 w-full sm:w-[260px]"
-                  />
-                  <Button variant="outline" size="sm" onClick={handleExport}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV ({exportedRows})
-                  </Button>
-                </div>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium sm:text-sm">
+                Verified
+              </CardTitle>
+              <CheckCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Amount</TableHead>
-                    {userRole === "owner" && (
-                      <TableHead>Submitted By</TableHead>
-                    )}
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.map((expense) => (
-                    <TableRow key={expense.id || `${expense.date}-${expense.description}`}>
-                      <TableCell>
-                        {format(new Date(expense.date), "MMM dd, yyyy")}
-                      </TableCell>
-                      <TableCell>{expense.category}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {expense.description}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(Number(expense.amount))}
-                      </TableCell>
-                      {userRole === "owner" && (
-                        <TableCell>{expense.submittedBy}</TableCell>
-                      )}
-                      <TableCell>{getStatusBadge(expense.status)}</TableCell>
-                      <TableCell>
-                        {expense.receipt ? (
-                          <span className="text-xs text-muted-foreground">
-                            Receipt #{expense.receipt}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="text-lg font-bold sm:text-2xl">
+                {metrics.verifiedExpenses}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Includes receipt + vendor
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium sm:text-sm">
+                Documented
+              </CardTitle>
+              <CheckCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg font-bold sm:text-2xl">
+                {metrics.documentedExpenses}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Vendor, note, or receipt attached
+              </p>
             </CardContent>
           </Card>
         </>
       )}
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xs font-medium sm:text-sm">
+            Avg Daily
+          </CardTitle>
+          <AlertCircle className="hidden h-4 w-4 text-muted-foreground sm:block" />
+        </CardHeader>
+        <CardContent>
+          <div className="truncate text-lg font-bold sm:text-2xl">
+            {formatCompactCurrency(metrics.averageDailyExpense)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Based on {daysElapsed} days this month
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+interface ExpenseListCardProps {
+  categoryFilter: ExpenseCategory;
+  expenses: ExpenseRecord[];
+  exportedRows: number;
+  searchTerm: string;
+  userRole: "owner" | "staff";
+  onCategoryChange: (value: ExpenseCategory) => void;
+  onExport: () => void;
+  onSearchTermChange: (value: string) => void;
+}
+
+function ExpenseListCard({
+  categoryFilter,
+  expenses,
+  exportedRows,
+  searchTerm,
+  userRole,
+  onCategoryChange,
+  onExport,
+  onSearchTermChange,
+}: ExpenseListCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="display-heading text-2xl">
+              Recent Expenses
+            </CardTitle>
+            <CardDescription>
+              {userRole === "staff"
+                ? "Your submitted expenses and their documentation quality"
+                : "All farm expenses with searchable records"}
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              value={categoryFilter}
+              onChange={(e) => onCategoryChange(e.target.value as ExpenseCategory)}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <Input
+              value={searchTerm}
+              onChange={(e) => onSearchTermChange(e.target.value)}
+              placeholder="Search description, type, vendor..."
+              className="h-9 w-full sm:w-[260px]"
+            />
+            <Button variant="outline" size="sm" onClick={onExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV ({exportedRows})
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Amount</TableHead>
+              {userRole === "owner" && <TableHead>Submitted By</TableHead>}
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {expenses.map((expense) => (
+              <TableRow
+                key={expense.id || `${expense.date}-${expense.description}`}
+              >
+                <TableCell>
+                  {format(new Date(expense.date), "MMM dd, yyyy")}
+                </TableCell>
+                <TableCell>{expense.category}</TableCell>
+                <TableCell className="max-w-[200px] truncate">
+                  {expense.description}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {formatCurrency(Number(expense.amount))}
+                </TableCell>
+                {userRole === "owner" && (
+                  <TableCell>{expense.submittedBy}</TableCell>
+                )}
+                <TableCell>
+                  <ExpenseStatusBadge status={expense.status} />
+                </TableCell>
+                <TableCell>
+                  {expense.receipt ? (
+                    <span className="text-xs text-muted-foreground">
+                      Receipt #{expense.receipt}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExpenseStatusBadge({
+  status,
+}: {
+  status: ExpenseRecord["status"];
+}) {
+  if (status === "verified") {
+    return (
+      <Badge className="border-transparent bg-success text-success-foreground">
+        <CheckCircle className="mr-1 h-3 w-3" />
+        Verified
+      </Badge>
+    );
+  }
+
+  if (status === "documented") {
+    return <Badge variant="secondary">Documented</Badge>;
+  }
+
+  return <Badge variant="outline">Recorded</Badge>;
+}
+
+function formatCompactCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }

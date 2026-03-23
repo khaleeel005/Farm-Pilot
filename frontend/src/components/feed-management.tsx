@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -30,38 +30,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Package, Plus, Calculator, Trash2 } from "lucide-react";
+import type { FeedCostEstimate, IngredientInput } from "@/lib/feedManagement";
 import {
-  getFeedBatches,
-  createFeedBatch,
-  calculateFeedBatchCost,
-  getFeedBatchUsageStats,
-  deleteFeedBatch,
-} from "@/lib/api";
-import type { FeedBatch, Ingredient, BatchUsageStats } from "@/types";
-import { useResourcePermissions, useToastContext } from "@/hooks";
+  buildFeedBatchPayload,
+  buildFeedIngredients,
+  createEmptyFeedBatchForm,
+  createEmptyIngredientInput,
+  validateFeedBatchForm,
+} from "@/lib/feedManagement";
+import { useFeedManagement, useResourcePermissions, useToastContext } from "@/hooks";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 
-// Local partial ingredient type for form input
-interface IngredientInput {
-  ingredientName: string;
-  quantityKg: number;
-  totalCost: number;
-  supplier: string;
-}
-
 export function FeedManagement() {
   const [showNewBatch, setShowNewBatch] = useState(false);
-  const [batches, setBatches] = useState<FeedBatch[]>([]);
-  const [batchUsageStats, setBatchUsageStats] = useState<BatchUsageStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [costEstimate, setCostEstimate] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const {
+    feedBatches: batches,
+    batchUsageStats,
+    loading,
+    error,
+    refresh,
+    createBatch,
+    deleteBatch,
+    estimateBatchCost,
+    isCreating,
+    isDeleting,
+    isCalculating,
+  } = useFeedManagement();
+  const [costEstimate, setCostEstimate] = useState<FeedCostEstimate | null>(null);
 
   // Permission checks
   const { canCreate, canDelete } = useResourcePermissions("FEED");
@@ -78,42 +76,7 @@ export function FeedManagement() {
   const [formErrors, setFormErrors] = useState<string[]>([]);
 
   // New batch form state
-  const [newBatch, setNewBatch] = useState({
-    batchName: "",
-    batchDate: new Date().toISOString().split("T")[0],
-    bagSizeKg: 50,
-    miscellaneousCost: 0,
-    ingredients: [
-      { ingredientName: "", quantityKg: 0, totalCost: 0, supplier: "" },
-    ] as IngredientInput[],
-  });
-
-  // Load data on component mount
-  useEffect(() => {
-    loadFeedData();
-  }, []);
-
-  const loadFeedData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [batchesData, usageStatsData] = await Promise.all([
-        getFeedBatches(),
-        getFeedBatchUsageStats(),
-      ]);
-      setBatches(Array.isArray(batchesData) ? batchesData : []);
-      setBatchUsageStats(Array.isArray(usageStatsData) ? usageStatsData : []);
-    } catch (err) {
-      console.error("Failed to load feed data:", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to load feed data";
-      setError(message);
-      setBatches([]);
-      setBatchUsageStats([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [newBatch, setNewBatch] = useState(createEmptyFeedBatchForm);
 
   // Use toast for notifications
   const showNotification = (
@@ -131,20 +94,7 @@ export function FeedManagement() {
   };
 
   const validateForm = (): boolean => {
-    const errors: string[] = [];
-
-    if (!newBatch.batchName.trim()) {
-      errors.push("Batch name is required");
-    }
-
-    const validIngredients = newBatch.ingredients.filter(
-      (ing) => ing.ingredientName && ing.quantityKg > 0 && ing.totalCost > 0,
-    );
-
-    if (validIngredients.length === 0) {
-      errors.push("At least one valid ingredient is required");
-    }
-
+    const errors = validateFeedBatchForm(newBatch);
     setFormErrors(errors);
     return errors.length === 0;
   };
@@ -154,12 +104,7 @@ export function FeedManagement() {
       ...newBatch,
       ingredients: [
         ...newBatch.ingredients,
-        {
-          ingredientName: "",
-          quantityKg: 0,
-          totalCost: 0,
-          supplier: "",
-        } as IngredientInput,
+        createEmptyIngredientInput(),
       ],
     });
   };
@@ -202,20 +147,15 @@ export function FeedManagement() {
         return;
       }
 
-      const ingredientsWithCostPerKg: Ingredient[] = validIngredients.map(
-        (ing) => ({
-          ...ing,
-          costPerKg: ing.quantityKg > 0 ? ing.totalCost / ing.quantityKg : 0,
-        }),
-      );
-
-      const response = (await calculateFeedBatchCost({
-        ingredients: ingredientsWithCostPerKg,
+      const response = await estimateBatchCost({
+        ingredients: buildFeedIngredients(validIngredients),
         bagSizeKg: newBatch.bagSizeKg,
         miscellaneousCost: newBatch.miscellaneousCost,
-      })) as { data?: Record<string, unknown> };
+      });
 
-      setCostEstimate(response?.data || (response as Record<string, unknown>));
+      setCostEstimate(
+        (response.data as FeedCostEstimate) || (response as FeedCostEstimate),
+      );
     } catch (error) {
       console.error("Failed to calculate cost:", error);
       showNotification(
@@ -236,43 +176,18 @@ export function FeedManagement() {
         (ing) => ing.ingredientName && ing.quantityKg > 0 && ing.totalCost > 0,
       );
 
-      // Compute costPerKg for each ingredient
-      const ingredientsWithCostPerKg: Ingredient[] = validIngredients.map(
-        (ing) => ({
-          ...ing,
-          costPerKg: ing.quantityKg > 0 ? ing.totalCost / ing.quantityKg : 0,
+      await createBatch(
+        buildFeedBatchPayload({
+          ...newBatch,
+          ingredients: validIngredients,
         }),
       );
 
-      const payload = {
-        batchDate: newBatch.batchDate,
-        batchName: newBatch.batchName,
-        bagSizeKg: newBatch.bagSizeKg,
-        miscellaneousCost: newBatch.miscellaneousCost,
-        ingredients: ingredientsWithCostPerKg,
-      };
-
-      await createFeedBatch(payload);
-
       // Reset form and reload data
-      setNewBatch({
-        batchName: "",
-        batchDate: new Date().toISOString().split("T")[0],
-        bagSizeKg: 50,
-        miscellaneousCost: 0,
-        ingredients: [
-          {
-            ingredientName: "",
-            quantityKg: 0,
-            totalCost: 0,
-            supplier: "",
-          } as IngredientInput,
-        ],
-      });
+      setNewBatch(createEmptyFeedBatchForm());
       setCostEstimate(null);
       setFormErrors([]);
       setShowNewBatch(false);
-      await loadFeedData();
       showNotification(
         "success",
         "Batch Created",
@@ -296,8 +211,7 @@ export function FeedManagement() {
     if (!deleteConfirm.batchId) return;
 
     try {
-      await deleteFeedBatch(deleteConfirm.batchId.toString());
-      await loadFeedData();
+      await deleteBatch(deleteConfirm.batchId.toString());
       showNotification(
         "success",
         "Batch Deleted",
@@ -338,8 +252,10 @@ export function FeedManagement() {
         />
         <ErrorState
           title="Failed to load feed data"
-          message={error}
-          onRetry={loadFeedData}
+          message={error.message}
+          onRetry={() => {
+            void refresh();
+          }}
         />
       </div>
     );
@@ -353,20 +269,7 @@ export function FeedManagement() {
         if (!open) {
           setShowNewBatch(false);
           setCostEstimate(null);
-          setNewBatch({
-            batchName: "",
-            batchDate: new Date().toISOString().split("T")[0],
-            bagSizeKg: 50,
-            miscellaneousCost: 0,
-            ingredients: [
-              {
-                ingredientName: "",
-                quantityKg: 0,
-                totalCost: 0,
-                supplier: "",
-              } as IngredientInput,
-            ],
-          });
+          setNewBatch(createEmptyFeedBatchForm());
         } else {
           setShowNewBatch(true);
         }
@@ -590,9 +493,10 @@ export function FeedManagement() {
               onClick={calculateCost}
               variant="outline"
               className="w-full"
+              disabled={isCalculating}
             >
               <Calculator className="h-4 w-4 mr-2" />
-              Calculate Cost Estimate
+              {isCalculating ? "Calculating..." : "Calculate Cost Estimate"}
             </Button>
 
             {costEstimate && (
@@ -657,29 +561,20 @@ export function FeedManagement() {
               onClick={() => {
                 setShowNewBatch(false);
                 setCostEstimate(null);
-                setNewBatch({
-                  batchName: "",
-                  batchDate: new Date().toISOString().split("T")[0],
-                  bagSizeKg: 50,
-                  miscellaneousCost: 0,
-                  ingredients: [
-                    {
-                      ingredientName: "",
-                      quantityKg: 0,
-                      totalCost: 0,
-                      supplier: "",
-                    },
-                  ],
-                });
+                setNewBatch(createEmptyFeedBatchForm());
               }}
               variant="outline"
               className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateBatch} className="w-full sm:w-auto">
+            <Button
+              onClick={handleCreateBatch}
+              className="w-full sm:w-auto"
+              disabled={isCreating}
+            >
               <Package className="h-4 w-4 mr-2" />
-              Create Batch
+              {isCreating ? "Creating Batch..." : "Create Batch"}
             </Button>
           </div>
         </div>
@@ -850,6 +745,7 @@ export function FeedManagement() {
                                 variant="outline"
                                 size="sm"
                                 className="text-red-600 hover:text-red-700 hover:border-red-300"
+                                disabled={isDeleting}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -892,9 +788,10 @@ export function FeedManagement() {
               variant="destructive"
               onClick={confirmDeleteBatch}
               className="w-full sm:w-auto"
+              disabled={isDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete Batch
+              {isDeleting ? "Deleting..." : "Delete Batch"}
             </Button>
           </div>
         </DialogContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -38,162 +38,60 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { useResourcePermissions, useToastContext } from "@/hooks";
+import { useReportsOverview } from "@/hooks/useReportsOverview";
+import { exportReport } from "@/lib/api";
 import {
-  getProductionReport,
-  getSalesReport,
-  getFinancialReport,
-  exportReport,
-  getCustomers,
-  getSales,
-} from "@/lib/api";
-import type {
-  ProductionReportData,
-  SalesReportData,
-  FinancialReportData,
-} from "@/lib/api";
+  getReportDateRange,
+  type ReportsDateRange,
+  type ReportsExportFormat,
+  type ReportsTab,
+} from "@/lib/reportsOverview";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 
-interface CustomerSummary {
-  name: string;
-  orders: number;
-  revenue: number;
-  avgOrder: number;
-}
-
 export function ReportsSection() {
-  const [dateRange, setDateRange] = useState("last-30-days");
-  const [reportType, setReportType] = useState("production");
-  const [exportFormat, setExportFormat] = useState("pdf");
-  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<ReportsDateRange>("last-30-days");
+  const [reportType, setReportType] = useState<ReportsTab>("production");
+  const [exportFormat, setExportFormat] = useState<ReportsExportFormat>("pdf");
   const [exporting, setExporting] = useState(false);
-
-  // Report data
-  const [productionData, setProductionData] =
-    useState<ProductionReportData | null>(null);
-  const [salesData, setSalesData] = useState<SalesReportData | null>(null);
-  const [financialData, setFinancialData] =
-    useState<FinancialReportData | null>(null);
-  const [topCustomers, setTopCustomers] = useState<CustomerSummary[]>([]);
+  const {
+    data,
+    error,
+    isLoading,
+    refetch,
+  } = useReportsOverview(dateRange);
 
   // Permission checks - export is owner only
   const { canExport } = useResourcePermissions("REPORTS");
   const toast = useToastContext();
-
-  // Calculate date range
-  const getDateRange = useCallback(() => {
-    const end = new Date();
-    let start = new Date();
-
-    switch (dateRange) {
-      case "last-7-days":
-        start.setDate(end.getDate() - 7);
-        break;
-      case "last-30-days":
-        start.setDate(end.getDate() - 30);
-        break;
-      case "last-90-days":
-        start.setDate(end.getDate() - 90);
-        break;
-      case "this-year":
-        start = new Date(end.getFullYear(), 0, 1);
-        break;
-      default:
-        start.setDate(end.getDate() - 30);
-    }
-
-    return {
-      startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
-    };
-  }, [dateRange]);
-
-  // Load all report data
-  const loadReports = useCallback(async () => {
-    setLoading(true);
-    const { startDate, endDate } = getDateRange();
-
-    try {
-      const [production, sales, financial] = await Promise.all([
-        getProductionReport(startDate, endDate).catch(() => null),
-        getSalesReport(startDate, endDate).catch(() => null),
-        getFinancialReport(startDate, endDate).catch(() => null),
-      ]);
-
-      setProductionData(production);
-      setSalesData(sales);
-      setFinancialData(financial);
-
-      // Calculate top customers from sales data
-      if (sales && sales.rows.length > 0) {
-        try {
-          const [customers, allSales] = await Promise.all([
-            getCustomers(),
-            getSales(),
-          ]);
-
-          // Group sales by customer
-          const customerSalesMap = new Map<
-            number,
-            { orders: number; revenue: number }
-          >();
-          allSales.forEach((sale) => {
-            if (sale.customerId) {
-              const existing = customerSalesMap.get(sale.customerId) || {
-                orders: 0,
-                revenue: 0,
-              };
-              customerSalesMap.set(sale.customerId, {
-                orders: existing.orders + 1,
-                revenue: existing.revenue + (Number(sale.totalAmount) || 0),
-              });
-            }
-          });
-
-          // Map to customer names and sort by revenue
-          const customerSummaries: CustomerSummary[] = [];
-          customerSalesMap.forEach((value, customerId) => {
-            const customer = customers.find((c) => c.id === customerId);
-            if (customer) {
-              customerSummaries.push({
-                name: customer.customerName,
-                orders: value.orders,
-                revenue: value.revenue,
-                avgOrder:
-                  value.orders > 0
-                    ? Math.round(value.revenue / value.orders)
-                    : 0,
-              });
-            }
-          });
-
-          setTopCustomers(
-            customerSummaries.sort((a, b) => b.revenue - a.revenue).slice(0, 5),
-          );
-        } catch {
-          setTopCustomers([]);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load reports:", err);
-      toast.error("Failed to load report data");
-    } finally {
-      setLoading(false);
-    }
-  }, [getDateRange, toast]);
-
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+  const range = data?.range ?? getReportDateRange(dateRange);
+  const productionData = data?.productionData ?? null;
+  const topCustomers = data?.topCustomers ?? [];
+  const weeklyData = data?.weeklyData ?? [];
+  const metrics = data?.metrics ?? {
+    totalEggs: 0,
+    avgDaily: 0,
+    crackedEggs: 0,
+    crackedPercent: 0,
+    totalRevenue: 0,
+    totalEggsSold: 0,
+    totalDozens: 0,
+    avgPricePerDozen: 0,
+    paidTransactions: 0,
+    pendingTransactions: 0,
+    totalOperatingCosts: 0,
+    netProfit: 0,
+    profitMargin: 0,
+  };
 
   // Handle export
   const handleExport = async (
-    type: "production" | "sales" | "financial",
-    format: "csv" | "pdf",
+    type: ReportsTab,
+    format: ReportsExportFormat,
   ) => {
     setExporting(true);
-    const { startDate, endDate } = getDateRange();
+    const { startDate, endDate } = range;
 
     try {
       const blob = await exportReport(type, format, startDate, endDate);
@@ -214,96 +112,20 @@ export function ReportsSection() {
     }
   };
 
-  // Calculate derived stats
-  const totalEggs = productionData?.totalEggs || 0;
-  const avgDaily = productionData?.avgPerDay || 0;
-  const crackedEggs =
-    productionData?.logs.reduce((sum, l) => sum + (l.crackedEggs || 0), 0) || 0;
-  const crackedPercent =
-    totalEggs > 0 ? Math.round((crackedEggs / totalEggs) * 100 * 10) / 10 : 0;
-
-  const totalRevenue = salesData?.totalAmount || 0;
-  const totalEggsSold = salesData?.totalEggs || 0;
-  const totalDozens = Math.floor(totalEggsSold / 12);
-  const avgPricePerDozen = totalDozens > 0 ? totalRevenue / totalDozens : 0;
-  const paidTransactions =
-    salesData?.rows.filter((r) => r.paymentStatus === "paid").length || 0;
-  const pendingTransactions =
-    salesData?.rows.filter((r) => r.paymentStatus === "pending").length || 0;
-
-  const totalOperatingCosts = financialData?.totalOperating || 0;
-  const netProfit = totalRevenue - totalOperatingCosts;
-  const profitMargin =
-    totalRevenue > 0
-      ? Math.round((netProfit / totalRevenue) * 100 * 10) / 10
-      : 0;
-
-  const { startDate, endDate } = getDateRange();
-  const rangeStart = new Date(startDate);
-  const rangeEnd = new Date(endDate);
-  const totalRangeDays = Math.max(
-    1,
-    Math.floor(
-      (rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24),
-    ) + 1,
-  );
-
-  // Group production/sales by real week index in the selected date range
-  const weekBuckets = new Map<
-    number,
-    { week: string; production: number; sales: number; days: Set<string> }
-  >();
-
-  const getWeekIndex = (isoDate: string) => {
-    const date = new Date(isoDate);
-    const diffDays = Math.floor(
-      (date.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    return Math.max(0, Math.floor(diffDays / 7));
-  };
-
-  productionData?.logs.forEach((log) => {
-    const weekIndex = getWeekIndex(log.logDate);
-    const existing = weekBuckets.get(weekIndex) || {
-      week: `Week ${weekIndex + 1}`,
-      production: 0,
-      sales: 0,
-      days: new Set<string>(),
-    };
-    existing.production += log.eggsCollected || 0;
-    existing.days.add(log.logDate);
-    weekBuckets.set(weekIndex, existing);
-  });
-
-  salesData?.rows.forEach((sale) => {
-    const weekIndex = getWeekIndex(sale.saleDate);
-    const existing = weekBuckets.get(weekIndex) || {
-      week: `Week ${weekIndex + 1}`,
-      production: 0,
-      sales: 0,
-      days: new Set<string>(),
-    };
-    existing.sales += sale.totalAmount || 0;
-    existing.days.add(sale.saleDate);
-    weekBuckets.set(weekIndex, existing);
-  });
-
-  const dailyOperatingCost = totalOperatingCosts / totalRangeDays;
-  const weeklyData = Array.from(weekBuckets.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([, data]) => {
-      const activeDays = Math.max(1, data.days.size);
-      const allocatedCost = dailyOperatingCost * activeDays;
-      return {
-        week: data.week,
-        production: data.production,
-        sales: data.sales,
-        profit: Math.round(data.sales - allocatedCost),
-      };
-    });
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingSpinner fullPage message="Loading reports..." />;
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        variant="reports"
+        title="Failed to load reports"
+        description={
+          error instanceof Error ? error.message : "Please try refreshing."
+        }
+      />
+    );
   }
 
   const headerActions = (
@@ -314,8 +136,8 @@ export function ReportsSection() {
           className="flex items-center gap-2 bg-transparent"
           onClick={() =>
             handleExport(
-              reportType as "production" | "sales" | "financial",
-              exportFormat as "csv" | "pdf",
+              reportType,
+              exportFormat,
             )
           }
           disabled={exporting}
@@ -324,7 +146,12 @@ export function ReportsSection() {
           {exporting ? "Exporting..." : "Export Data"}
         </Button>
       )}
-      <Button className="flex items-center gap-2" onClick={loadReports}>
+      <Button
+        className="flex items-center gap-2"
+        onClick={() => {
+          void refetch();
+        }}
+      >
         <FileText className="h-4 w-4" />
         Refresh Report
       </Button>
@@ -353,7 +180,12 @@ export function ReportsSection() {
           <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
               <Label>Date Range</Label>
-              <Select value={dateRange} onValueChange={setDateRange}>
+              <Select
+                value={dateRange}
+                onValueChange={(value) =>
+                  setDateRange(value as ReportsDateRange)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -368,7 +200,10 @@ export function ReportsSection() {
 
             <div className="space-y-2">
               <Label>Report Type</Label>
-              <Select value={reportType} onValueChange={setReportType}>
+              <Select
+                value={reportType}
+                onValueChange={(value) => setReportType(value as ReportsTab)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -382,7 +217,12 @@ export function ReportsSection() {
 
             <div className="space-y-2">
               <Label>Export Format</Label>
-              <Select value={exportFormat} onValueChange={setExportFormat}>
+              <Select
+                value={exportFormat}
+                onValueChange={(value) =>
+                  setExportFormat(value as ReportsExportFormat)
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -424,10 +264,10 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="display-heading text-3xl leading-none">
-                  {totalEggs.toLocaleString()}
+                  {metrics.totalEggs.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round(avgDaily)} eggs/day average
+                  {Math.round(metrics.avgDaily)} eggs/day average
                 </p>
               </CardContent>
             </Card>
@@ -441,10 +281,10 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="display-heading text-3xl leading-none">
-                  ₦{totalRevenue.toLocaleString()}
+                  ₦{metrics.totalRevenue.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {totalDozens} dozens sold
+                  {metrics.totalDozens} dozens sold
                 </p>
               </CardContent>
             </Card>
@@ -458,10 +298,10 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="display-heading text-3xl leading-none">
-                  {profitMargin}%
+                  {metrics.profitMargin}%
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {profitMargin > 15 ? "Above" : "Below"} industry average
+                  {metrics.profitMargin > 15 ? "Above" : "Below"} industry average
                 </p>
               </CardContent>
             </Card>
@@ -527,7 +367,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl sm:text-2xl font-bold">
-                  {totalEggs.toLocaleString()}
+                  {metrics.totalEggs.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -540,10 +380,10 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl sm:text-2xl font-bold">
-                  {crackedPercent}%
+                  {metrics.crackedPercent}%
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {crackedEggs.toLocaleString()} eggs
+                  {metrics.crackedEggs.toLocaleString()} eggs
                 </div>
               </CardContent>
             </Card>
@@ -556,7 +396,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl sm:text-2xl font-bold">
-                  {Math.round(avgDaily)}
+                  {Math.round(metrics.avgDaily)}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   eggs per day
@@ -622,7 +462,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold truncate">
-                  ₦{totalRevenue.toLocaleString()}
+                  ₦{metrics.totalRevenue.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -635,7 +475,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold">
-                  {totalDozens.toLocaleString()}
+                  {metrics.totalDozens.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -648,7 +488,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold truncate">
-                  ₦{Math.round(avgPricePerDozen).toLocaleString()}
+                  ₦{Math.round(metrics.avgPricePerDozen).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -661,10 +501,10 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold">
-                  {paidTransactions + pendingTransactions > 0
+                  {metrics.paidTransactions + metrics.pendingTransactions > 0
                     ? Math.round(
-                        (paidTransactions /
-                          (paidTransactions + pendingTransactions)) *
+                        (metrics.paidTransactions /
+                          (metrics.paidTransactions + metrics.pendingTransactions)) *
                           100,
                       )
                     : 0}
@@ -747,7 +587,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold text-chart-5 truncate">
-                  ₦{totalRevenue.toLocaleString()}
+                  ₦{metrics.totalRevenue.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -760,7 +600,7 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-lg sm:text-2xl font-bold text-destructive truncate">
-                  ₦{totalOperatingCosts.toLocaleString()}
+                  ₦{metrics.totalOperatingCosts.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -773,9 +613,9 @@ export function ReportsSection() {
               </CardHeader>
               <CardContent>
                 <div
-                  className={`text-lg sm:text-2xl font-bold truncate ${netProfit >= 0 ? "text-chart-5" : "text-destructive"}`}
+                  className={`text-lg sm:text-2xl font-bold truncate ${metrics.netProfit >= 0 ? "text-chart-5" : "text-destructive"}`}
                 >
-                  ₦{netProfit.toLocaleString()}
+                  ₦{metrics.netProfit.toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -793,7 +633,7 @@ export function ReportsSection() {
                 <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
                   <span className="font-medium text-sm">Total Revenue</span>
                   <span className="text-base sm:text-lg font-bold text-chart-5">
-                    ₦{totalRevenue.toLocaleString()}
+                    ₦{metrics.totalRevenue.toLocaleString()}
                   </span>
                 </div>
 
@@ -802,7 +642,7 @@ export function ReportsSection() {
                     Total Operating Costs
                   </span>
                   <span className="text-base sm:text-lg font-bold text-destructive">
-                    ₦{totalOperatingCosts.toLocaleString()}
+                    ₦{metrics.totalOperatingCosts.toLocaleString()}
                   </span>
                 </div>
 
@@ -813,9 +653,9 @@ export function ReportsSection() {
                     Net Profit
                   </span>
                   <span
-                    className={`text-xl sm:text-2xl font-bold ${netProfit >= 0 ? "text-primary" : "text-destructive"}`}
+                    className={`text-xl sm:text-2xl font-bold ${metrics.netProfit >= 0 ? "text-primary" : "text-destructive"}`}
                   >
-                    ₦{netProfit.toLocaleString()}
+                    ₦{metrics.netProfit.toLocaleString()}
                   </span>
                 </div>
 
@@ -823,14 +663,14 @@ export function ReportsSection() {
                   <span className="font-medium text-sm">Profit Margin</span>
                   <Badge
                     variant={
-                      profitMargin > 15
+                      metrics.profitMargin > 15
                         ? "default"
-                        : profitMargin > 0
+                        : metrics.profitMargin > 0
                           ? "secondary"
                           : "destructive"
                     }
                   >
-                    {profitMargin}%
+                    {metrics.profitMargin}%
                   </Badge>
                 </div>
               </div>

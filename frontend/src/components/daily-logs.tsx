@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { getDailyLogs, deleteDailyLog, updateDailyLog, getHouses, getFeedBatches } from '@/lib/api';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -41,75 +40,40 @@ import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { PageHeader } from '@/components/shared/page-header';
-import { useResourcePermissions, useToastContext } from '@/hooks';
-import { DailyLog, DailyLogPayload, House, FeedBatch } from '@/types';
+import {
+  useDailyLogs,
+  useDeleteDailyLog,
+  useFeedInventory,
+  useResourcePermissions,
+  useToastContext,
+  useUpdateDailyLog,
+} from '@/hooks';
+import { calculateDailyLogStats } from '@/lib/dailyLogs';
+import type { DailyLog, DailyLogPayload } from '@/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import {
+  EMPTY_DAILY_LOG_FORM,
+  buildDailyLogUpdatePayload,
+} from '@/lib/dailyLogForm';
 
 export function DailyLogs() {
-  const [logs, setLogs] = useState<DailyLog[]>([]);
-  const [, setHouses] = useState<House[]>([]);
-  const [feedBatches, setFeedBatches] = useState<FeedBatch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
-  
-  // Delete confirmation state
-  const [deleteConfirmLog, setDeleteConfirmLog] = useState<DailyLog | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  
-  // Edit state
-  const [editingLog, setEditingLog] = useState<DailyLog | null>(null);
-  const [editForm, setEditForm] = useState({
-    eggsCollected: '',
-    crackedEggs: '',
-    feedBatchId: '',
-    feedBagsUsed: '',
-    mortalityCount: '',
-    notes: '',
+  const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
+  const { logs, loading, error, refresh } = useDailyLogs({
+    date: selectedDateString,
   });
-  const [saving, setSaving] = useState(false);
+  const { feedBatches } = useFeedInventory();
+  const deleteDailyLogMutation = useDeleteDailyLog();
+  const updateDailyLogMutation = useUpdateDailyLog();
 
+  const [deleteConfirmLog, setDeleteConfirmLog] = useState<DailyLog | null>(null);
+  const [editingLog, setEditingLog] = useState<DailyLog | null>(null);
+  const [editForm, setEditForm] = useState({ ...EMPTY_DAILY_LOG_FORM });
   const toast = useToastContext();
   const { canUpdate, canDelete } = useResourcePermissions('DAILY_LOGS');
-
-  const loadLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const res = await getDailyLogs({ date: dateStr });
-      setLogs(Array.isArray(res) ? res : []);
-    } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : 'Failed to load logs';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDate]);
-
-  const loadReferenceData = useCallback(async () => {
-    try {
-      const [housesData, batchesData] = await Promise.all([
-        getHouses().catch(() => []),
-        getFeedBatches().catch(() => []),
-      ]);
-      setHouses(Array.isArray(housesData) ? housesData : []);
-      setFeedBatches(Array.isArray(batchesData) ? batchesData : []);
-    } catch (err) {
-      console.error('Failed to load reference data:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
-
-  useEffect(() => {
-    loadReferenceData();
-  }, [loadReferenceData]);
+  const stats = useMemo(() => calculateDailyLogStats(logs), [logs]);
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
@@ -136,19 +100,15 @@ export function DailyLogs() {
 
   const handleDelete = async () => {
     if (!deleteConfirmLog) return;
-    
-    setDeleting(true);
+
     try {
-      await deleteDailyLog(deleteConfirmLog.id);
+      await deleteDailyLogMutation.mutateAsync(deleteConfirmLog.id);
       toast.success('Daily log deleted successfully!');
       setDeleteConfirmLog(null);
-      loadLogs();
     } catch (err) {
       console.error('Delete failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to delete log';
       toast.error(message);
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -167,35 +127,22 @@ export function DailyLogs() {
   const handleSaveEdit = async () => {
     if (!editingLog) return;
 
-    setSaving(true);
     try {
-      const payload: Partial<DailyLogPayload> = {
-        eggsCollected: parseInt(editForm.eggsCollected) || 0,
-        crackedEggs: parseInt(editForm.crackedEggs) || 0,
-        feedBatchId: editForm.feedBatchId ? parseInt(editForm.feedBatchId) : null,
-        feedBagsUsed: parseFloat(editForm.feedBagsUsed) || 0,
-        mortalityCount: parseInt(editForm.mortalityCount) || 0,
-        notes: editForm.notes || undefined,
-      };
+      const payload: Partial<DailyLogPayload> =
+        buildDailyLogUpdatePayload(editForm);
 
-      await updateDailyLog(editingLog.id, payload);
+      await updateDailyLogMutation.mutateAsync({
+        id: editingLog.id,
+        payload,
+      });
       toast.success('Daily log updated successfully!');
       setEditingLog(null);
-      loadLogs();
     } catch (err) {
       console.error('Update failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to update log';
       toast.error(message);
-    } finally {
-      setSaving(false);
     }
   };
-
-  // Calculate summary stats for the selected date
-  const totalEggs = logs.reduce((sum, log) => sum + (log.eggsCollected || 0), 0);
-  const totalCracked = logs.reduce((sum, log) => sum + (log.crackedEggs || 0), 0);
-  const totalMortality = logs.reduce((sum, log) => sum + (log.mortalityCount || 0), 0);
-  const totalFeedBags = logs.reduce((sum, log) => sum + (Number(log.feedBagsUsed) || 0), 0);
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
@@ -234,7 +181,14 @@ export function DailyLogs() {
           Today
         </Button>
       )}
-      <Button variant="outline" size="icon" onClick={loadLogs} disabled={loading}>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => {
+          void refresh();
+        }}
+        disabled={loading}
+      >
         <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
       </Button>
     </div>
@@ -253,11 +207,19 @@ export function DailyLogs() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmLog(null)} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmLog(null)}
+              disabled={deleteDailyLogMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? 'Deleting...' : 'Delete'}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteDailyLogMutation.isPending}
+            >
+              {deleteDailyLogMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -348,11 +310,18 @@ export function DailyLogs() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingLog(null)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => setEditingLog(null)}
+              disabled={updateDailyLogMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSaveEdit} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateDailyLogMutation.isPending}
+            >
+              {updateDailyLogMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -381,7 +350,12 @@ export function DailyLogs() {
           {loading ? (
             <LoadingSpinner message="Loading logs..." />
           ) : error ? (
-            <ErrorState message={error} onRetry={loadLogs} />
+            <ErrorState
+              message={error.message}
+              onRetry={() => {
+                void refresh();
+              }}
+            />
           ) : logs.length === 0 ? (
             <EmptyState
               title="No logs for this date"
@@ -396,19 +370,27 @@ export function DailyLogs() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                 <div className="bg-muted rounded-lg p-3">
                   <div className="text-sm text-muted-foreground">Total Eggs</div>
-                  <div className="text-xl font-bold">{totalEggs.toLocaleString()}</div>
+                  <div className="text-xl font-bold">
+                    {stats.totalEggs.toLocaleString()}
+                  </div>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <div className="text-sm text-muted-foreground">Cracked</div>
-                  <div className="text-xl font-bold text-orange-600">{totalCracked}</div>
+                  <div className="text-xl font-bold text-orange-600">
+                    {stats.totalCracked}
+                  </div>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <div className="text-sm text-muted-foreground">Mortality</div>
-                  <div className="text-xl font-bold text-red-600">{totalMortality}</div>
+                  <div className="text-xl font-bold text-red-600">
+                    {stats.totalMortality}
+                  </div>
                 </div>
                 <div className="bg-muted rounded-lg p-3">
                   <div className="text-sm text-muted-foreground">Feed Bags</div>
-                  <div className="text-xl font-bold">{totalFeedBags}</div>
+                  <div className="text-xl font-bold">
+                    {stats.totalFeedBags}
+                  </div>
                 </div>
               </div>
 

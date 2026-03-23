@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -18,158 +17,70 @@ import {
   Target,
   AlertCircle,
 } from "lucide-react";
-import { getEggPriceEstimate, getSales } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
+import { useCostAnalysisOverview } from "@/hooks";
+import { getCostBreakdownItems } from "@/lib/costAnalysis";
 
-interface CostBreakdown {
-  feedCost: number;
-  laborCost: number;
-  fixedCosts: number;
-  healthCosts: number;
-  total: number;
-}
+const emptyCostBreakdown = {
+  feedCost: 0,
+  laborCost: 0,
+  fixedCosts: 0,
+  healthCosts: 0,
+  total: 0,
+};
 
-interface PricingData {
-  cost: number;
-  markup: number;
-  suggested: number;
-  current: number;
-}
+const emptyPricingRecommendation = {
+  cost: 0,
+  markup: 20,
+  suggested: 0,
+  current: 0,
+};
 
-interface MonthlyProjection {
-  avgDailyProduction: number;
-  avgCostPerEgg: number;
-  avgSellingPrice: number;
-  profitPerEgg: number;
-  monthlyProfit: number;
-}
-
-interface CostEstimate {
-  date: string;
-  avgMonthlyProduction: number;
-  avgDailyProduction: number;
-  feedCostPerEgg: number;
-  laborCostPerEgg: number;
-  fixedCostPerEgg: number;
-  healthCostPerEgg: number;
-  totalCostPerEgg: number;
-  suggestedPrice: number;
-}
+const emptyMonthlyProjection = {
+  avgDailyProduction: 0,
+  avgCostPerEgg: 0,
+  avgSellingPrice: 0,
+  profitPerEgg: 0,
+  monthlyProfit: 0,
+};
 
 export function CostAnalysis() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [costData, setCostData] = useState<CostEstimate | null>(null);
-  const [avgSellingPrice, setAvgSellingPrice] = useState(0);
+  const { data, isPending, error, refetch } = useCostAnalysisOverview();
+  const costBreakdown = data?.costBreakdown ?? emptyCostBreakdown;
+  const pricingRecommendation =
+    data?.pricingRecommendation ?? emptyPricingRecommendation;
+  const monthlyProjection = data?.monthlyProjection ?? emptyMonthlyProjection;
+  const avgDailyProduction = data?.avgDailyProduction ?? 0;
+  const profitPerEgg = data?.profitPerEgg ?? 0;
+  const profitMargin = data?.profitMargin ?? 0;
+  const pricingInsights = data?.pricingInsights ?? [];
 
-  useEffect(() => {
-    loadCostData();
-  }, []);
-
-  const loadCostData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const today = new Date().toISOString().split("T")[0];
-
-      // Fetch cost estimate and recent sales in parallel
-      const [costEstimate, salesData] = await Promise.all([
-        getEggPriceEstimate(today),
-        getSales({ limit: "100" }).catch(() => []),
-      ]);
-
-      setCostData(costEstimate as CostEstimate);
-
-      // Calculate average selling price from recent sales
-      const sales = Array.isArray(salesData) ? salesData : [];
-      if (sales.length > 0) {
-        const totalRevenue = sales.reduce(
-          (sum: number, sale: { totalAmount?: number; quantity?: number }) =>
-            sum + (Number(sale.totalAmount) || 0),
-          0,
-        );
-        const totalEggs = sales.reduce(
-          (sum: number, sale: { totalAmount?: number; quantity?: number }) =>
-            sum + (Number(sale.quantity) || 0),
-          0,
-        );
-        setAvgSellingPrice(totalEggs > 0 ? totalRevenue / totalEggs : 0);
-      }
-    } catch (err) {
-      console.error("Failed to load cost data:", err);
-      setError("Failed to load cost analysis data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calculate derived values
-  const costBreakdown: CostBreakdown = costData
-    ? {
-        feedCost: Number(costData.feedCostPerEgg) || 0,
-        laborCost: Number(costData.laborCostPerEgg) || 0,
-        fixedCosts: Number(costData.fixedCostPerEgg) || 0,
-        healthCosts: Number(costData.healthCostPerEgg) || 0,
-        total: Number(costData.totalCostPerEgg) || 0,
-      }
-    : {
-        feedCost: 0,
-        laborCost: 0,
-        fixedCosts: 0,
-        healthCosts: 0,
-        total: 0,
-      };
-
-  const pricingRecommendation: PricingData = costData
-    ? {
-        cost: costBreakdown.total,
-        markup: 20,
-        suggested: Number(costData.suggestedPrice) || 0,
-        current: avgSellingPrice || Number(costData.suggestedPrice) || 0,
-      }
-    : { cost: 0, markup: 20, suggested: 0, current: 0 };
-
-  const effectiveSellingPrice =
-    avgSellingPrice || costData?.suggestedPrice || 0;
-  const profitPerEgg = effectiveSellingPrice - costBreakdown.total;
-  const avgDailyProduction = Number(costData?.avgDailyProduction) || 0;
-
-  const monthlyProjection: MonthlyProjection = {
-    avgDailyProduction,
-    avgCostPerEgg: costBreakdown.total,
-    avgSellingPrice: effectiveSellingPrice,
-    profitPerEgg,
-    monthlyProfit: profitPerEgg * avgDailyProduction * 30,
-  };
-
-  const profitMargin =
-    effectiveSellingPrice > 0
-      ? (profitPerEgg / effectiveSellingPrice) * 100
-      : 0;
-
-  if (loading) {
+  if (isPending) {
     return <LoadingSpinner fullPage message="Loading cost analysis..." />;
   }
 
   if (error) {
     return (
-      <ErrorState title="Failed to load analysis" message={error} onRetry={loadCostData} />
+      <ErrorState
+        title="Failed to load analysis"
+        message={error.message}
+        onRetry={() => {
+          void refetch();
+        }}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <PageHeader
         eyebrow="Financial Intelligence"
         title="Cost Analysis"
         description="Real-time cost calculations and pricing recommendations"
       />
 
-      {/* Cost Overview */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -267,7 +178,6 @@ export function CostAnalysis() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Cost Breakdown */}
         <Card>
           <CardHeader>
             <CardTitle className="display-heading text-2xl">
@@ -280,107 +190,28 @@ export function CostAnalysis() {
           <CardContent className="space-y-4">
             {costBreakdown.total > 0 ? (
               <>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Feed Cost</div>
-                      <div className="text-xs text-muted-foreground">
-                        {(
-                          (costBreakdown.feedCost / costBreakdown.total) *
-                          100
-                        ).toFixed(1)}
-                        % of total
+                {getCostBreakdownItems(costBreakdown).map((item) => (
+                  <div key={item.key} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium">{item.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {((item.amount / costBreakdown.total) * 100).toFixed(1)}
+                          % of total
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">
+                          ₦{item.amount.toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        ₦{costBreakdown.feedCost.toFixed(2)}
-                      </div>
-                    </div>
+                    <Progress
+                      value={(item.amount / costBreakdown.total) * 100}
+                      className="h-2"
+                    />
                   </div>
-                  <Progress
-                    value={(costBreakdown.feedCost / costBreakdown.total) * 100}
-                    className="h-2"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Labor Cost</div>
-                      <div className="text-xs text-muted-foreground">
-                        {(
-                          (costBreakdown.laborCost / costBreakdown.total) *
-                          100
-                        ).toFixed(1)}
-                        % of total
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        ₦{costBreakdown.laborCost.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  <Progress
-                    value={
-                      (costBreakdown.laborCost / costBreakdown.total) * 100
-                    }
-                    className="h-2"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Fixed Costs</div>
-                      <div className="text-xs text-muted-foreground">
-                        {(
-                          (costBreakdown.fixedCosts / costBreakdown.total) *
-                          100
-                        ).toFixed(1)}
-                        % of total
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        ₦{costBreakdown.fixedCosts.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  <Progress
-                    value={
-                      (costBreakdown.fixedCosts / costBreakdown.total) * 100
-                    }
-                    className="h-2"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Health Costs</div>
-                      <div className="text-xs text-muted-foreground">
-                        {(
-                          (costBreakdown.healthCosts / costBreakdown.total) *
-                          100
-                        ).toFixed(1)}
-                        % of total
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">
-                        ₦{costBreakdown.healthCosts.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  <Progress
-                    value={
-                      (costBreakdown.healthCosts / costBreakdown.total) * 100
-                    }
-                    className="h-2"
-                  />
-                </div>
+                ))}
 
                 <Separator />
 
@@ -402,7 +233,6 @@ export function CostAnalysis() {
           </CardContent>
         </Card>
 
-        {/* Pricing Recommendations */}
         <Card>
           <CardHeader>
             <CardTitle className="display-heading text-2xl">
@@ -462,35 +292,9 @@ export function CostAnalysis() {
                     <div className="text-sm font-medium">Pricing Insights</div>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    {profitMargin > 20 ? (
-                      <>
-                        <p>
-                          • Your pricing strategy is generating healthy margins
-                        </p>
-                        <p>
-                          • Consider maintaining prices during high demand
-                          periods
-                        </p>
-                      </>
-                    ) : profitMargin > 10 ? (
-                      <>
-                        <p>• Margins are acceptable but could be improved</p>
-                        <p>• Consider slight price increases</p>
-                      </>
-                    ) : profitMargin > 0 ? (
-                      <>
-                        <p>• Current margins are below target</p>
-                        <p>
-                          • Review pricing or look for cost reduction
-                          opportunities
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p>• Record sales to see pricing insights</p>
-                        <p>• Suggested prices include recommended markups</p>
-                      </>
-                    )}
+                    {pricingInsights.map((insight) => (
+                      <p key={insight}>• {insight}</p>
+                    ))}
                   </div>
                 </div>
               </>
@@ -506,7 +310,6 @@ export function CostAnalysis() {
         </Card>
       </div>
 
-      {/* Profitability Analysis */}
       <Card>
         <CardHeader>
           <CardTitle className="display-heading text-2xl">

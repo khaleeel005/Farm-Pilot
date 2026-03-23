@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -29,9 +29,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DollarSign, Users, Plus } from "lucide-react";
-import { getSales, getCustomers, createSale, createCustomer } from "@/lib/api";
-import type { Sale, Customer, SalePayload, CustomerPayload } from "@/types";
-import { useResourcePermissions, useToastContext } from "@/hooks";
+import type { Customer, Sale } from "@/types";
+import {
+  useResourcePermissions,
+  useSales,
+  useToastContext,
+} from "@/hooks";
+import {
+  buildCustomerPayload,
+  buildSalePayload,
+  calculateSaleFormTotal,
+  createEmptyCustomerForm,
+  createEmptySaleForm,
+  type CustomerFormData,
+  type SaleFormData,
+} from "@/lib/salesManagement";
 import {
   Dialog,
   DialogContent,
@@ -45,199 +57,143 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 
 export function SalesManagement() {
+  const {
+    sales,
+    customers,
+    loading,
+    error,
+    refresh,
+    createSale,
+    createCustomer,
+    summary,
+    isCreatingSale,
+    isCreatingCustomer,
+  } = useSales();
   const [showNewSale, setShowNewSale] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [saleForm, setSaleForm] = useState<SaleFormData>(() =>
+    createEmptySaleForm(),
+  );
+  const [customerForm, setCustomerForm] = useState<CustomerFormData>(() =>
+    createEmptyCustomerForm(),
+  );
   const toast = useToastContext();
 
-  // Permission checks
   const { canCreate: canCreateSale } = useResourcePermissions("SALES");
-  const { canCreate: canCreateCustomer } = useResourcePermissions("CUSTOMERS");
+  const { canCreate: canCreateCustomer } =
+    useResourcePermissions("CUSTOMERS");
 
-  // Sales form state
-  const [saleForm, setSaleForm] = useState({
-    customerId: "",
-    saleDate: new Date().toISOString().split("T")[0],
-    quantity: "",
-    pricePerEgg: "",
-    paymentMethod: "",
-    paymentStatus: "pending",
-    notes: "",
-  });
+  const resetSaleForm = useCallback(() => {
+    setSaleForm(createEmptySaleForm());
+  }, []);
 
-  // Customer form state
-  const [customerForm, setCustomerForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    customerType: "individual",
-  });
+  const resetCustomerForm = useCallback(() => {
+    setCustomerForm(createEmptyCustomerForm());
+  }, []);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [salesData, customersData] = await Promise.all([
-        getSales().catch(() => []),
-        getCustomers().catch(() => []),
-      ]);
-      setSales(Array.isArray(salesData) ? salesData : []);
-      setCustomers(Array.isArray(customersData) ? customersData : []);
-    } catch (err) {
-      console.error("Failed to load data:", err);
-      toast.error("Failed to load sales data");
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const handleSaleFieldChange = useCallback(
+    (field: keyof SaleFormData, value: string) => {
+      setSaleForm((currentForm) => ({
+        ...currentForm,
+        [field]: value,
+      }));
+    },
+    [],
+  );
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const handleCustomerFieldChange = useCallback(
+    (field: keyof CustomerFormData, value: string) => {
+      setCustomerForm((currentForm) => ({
+        ...currentForm,
+        [field]: value,
+      }));
+    },
+    [],
+  );
 
-  const calculateTotal = () => {
-    const quantity = parseFloat(saleForm.quantity) || 0;
-    const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0;
-
-    return quantity * pricePerEgg;
-  };
-
-  const handleCreateSale = async () => {
+  const handleCreateSale = useCallback(async () => {
     if (!saleForm.customerId) {
-      toast.error("Please select a customer");
+      toast.error("Please select a customer.");
       return;
     }
 
-    const quantity = parseFloat(saleForm.quantity) || 0;
+    const payload = buildSalePayload(saleForm);
 
-    if (quantity === 0) {
-      toast.error("Please enter egg quantity");
+    if (payload.quantity <= 0) {
+      toast.error("Please enter egg quantity.");
       return;
     }
 
     try {
-      setSubmitting(true);
-
-      const pricePerEgg = parseFloat(saleForm.pricePerEgg) || 0;
-      const totalAmount = calculateTotal();
-
-      const payload: SalePayload = {
-        customerId: parseInt(saleForm.customerId),
-        saleDate: saleForm.saleDate,
-        quantity,
-        pricePerEgg,
-        totalAmount,
-        paymentStatus: saleForm.paymentStatus as "paid" | "pending",
-        paymentMethod: (saleForm.paymentMethod || undefined) as
-          | "cash"
-          | "transfer"
-          | "check"
-          | undefined,
-      };
-
       await createSale(payload);
       toast.success("Sale recorded successfully!");
-
-      // Reset form and reload data
-      setSaleForm({
-        customerId: "",
-        saleDate: new Date().toISOString().split("T")[0],
-        quantity: "",
-        pricePerEgg: "",
-        paymentMethod: "",
-        paymentStatus: "pending",
-        notes: "",
-      });
+      resetSaleForm();
       setShowNewSale(false);
-      loadData();
-    } catch (err) {
-      console.error("Failed to create sale:", err);
-      toast.error("Failed to record sale. Please try again.");
-    } finally {
-      setSubmitting(false);
+    } catch (createSaleError) {
+      console.error("Failed to create sale:", createSaleError);
+      toast.error(
+        createSaleError instanceof Error
+          ? createSaleError.message
+          : "Failed to record sale. Please try again.",
+      );
     }
-  };
+  }, [createSale, resetSaleForm, saleForm, toast]);
 
-  const handleCreateCustomer = async () => {
+  const handleCreateCustomer = useCallback(async () => {
     if (!customerForm.name.trim()) {
-      toast.error("Customer name is required");
+      toast.error("Customer name is required.");
       return;
     }
 
     try {
-      setSubmitting(true);
-
-      const payload: CustomerPayload = {
-        customerName: customerForm.name.trim(),
-        phone: customerForm.phone || undefined,
-        email: customerForm.email || undefined,
-        address: customerForm.address || undefined,
-      };
-
-      await createCustomer(payload);
+      await createCustomer(buildCustomerPayload(customerForm));
       toast.success("Customer created successfully!");
-
-      // Reset form and reload customers
-      setCustomerForm({
-        name: "",
-        phone: "",
-        email: "",
-        address: "",
-        customerType: "individual",
-      });
+      resetCustomerForm();
       setShowNewCustomer(false);
-
-      // Reload customers
-      const customersData = await getCustomers();
-      setCustomers(Array.isArray(customersData) ? customersData : []);
-    } catch (err) {
-      console.error("Failed to create customer:", err);
-      toast.error("Failed to create customer. Please try again.");
-    } finally {
-      setSubmitting(false);
+    } catch (createCustomerError) {
+      console.error("Failed to create customer:", createCustomerError);
+      toast.error(
+        createCustomerError instanceof Error
+          ? createCustomerError.message
+          : "Failed to create customer. Please try again.",
+      );
     }
-  };
+  }, [createCustomer, customerForm, resetCustomerForm, toast]);
 
-  // Calculate summary stats
-  const today = new Date().toISOString().split("T")[0];
-  const todaySales = sales.filter((s) => s.saleDate === today);
-  const todayTotal = todaySales.reduce(
-    (sum, s) => sum + (Number(s.totalAmount) || 0),
-    0,
-  );
-  const todayEggs = todaySales.reduce(
-    (sum, s) => sum + (Number(s.quantity) || 0),
-    0,
-  );
-  const pendingPayments = sales
-    .filter((s) => s.paymentStatus === "pending")
-    .reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
-  const pendingCount = sales.filter(
-    (s) => s.paymentStatus === "pending",
-  ).length;
+  const saleTotal = useMemo(() => calculateSaleFormTotal(saleForm), [saleForm]);
+  const customerNames = useMemo(() => {
+    return new Map(customers.map((customer) => [customer.id, customer]));
+  }, [customers]);
 
-  if (loading) {
+  if (loading && sales.length === 0 && customers.length === 0) {
     return <LoadingSpinner fullPage message="Loading sales data..." />;
   }
 
-  // Build header actions
+  if (error && sales.length === 0 && customers.length === 0) {
+    return (
+      <EmptyState
+        variant="sales"
+        title="Unable to load sales data"
+        description={error.message || "Please try loading this page again."}
+        actionLabel="Try Again"
+        onAction={() => {
+          void refresh();
+        }}
+      />
+    );
+  }
+
   const headerActions = (
     <div className="flex gap-2">
       {canCreateCustomer && (
         <Button variant="outline" onClick={() => setShowNewCustomer(true)}>
-          <Users className="h-4 w-4 mr-2" />
+          <Users className="mr-2 h-4 w-4" />
           Add Customer
         </Button>
       )}
       {canCreateSale && (
-        <Button
-          onClick={() => setShowNewSale(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
+        <Button onClick={() => setShowNewSale(true)}>
+          <Plus className="mr-2 h-4 w-4" />
           New Sale
         </Button>
       )}
@@ -246,7 +202,6 @@ export function SalesManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <PageHeader
         eyebrow="Revenue Desk"
         title="Sales Management"
@@ -254,7 +209,6 @@ export function SalesManagement() {
         actions={headerActions}
       />
 
-      {/* New Customer Dialog */}
       <Dialog open={showNewCustomer} onOpenChange={setShowNewCustomer}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -266,8 +220,8 @@ export function SalesManagement() {
               <Label>Customer Name *</Label>
               <Input
                 value={customerForm.name}
-                onChange={(e) =>
-                  setCustomerForm((prev) => ({ ...prev, name: e.target.value }))
+                onChange={(event) =>
+                  handleCustomerFieldChange("name", event.target.value)
                 }
                 placeholder="Enter customer name"
               />
@@ -277,11 +231,8 @@ export function SalesManagement() {
                 <Label>Phone</Label>
                 <Input
                   value={customerForm.phone}
-                  onChange={(e) =>
-                    setCustomerForm((prev) => ({
-                      ...prev,
-                      phone: e.target.value,
-                    }))
+                  onChange={(event) =>
+                    handleCustomerFieldChange("phone", event.target.value)
                   }
                   placeholder="+234 xxx xxx xxxx"
                 />
@@ -291,10 +242,7 @@ export function SalesManagement() {
                 <Select
                   value={customerForm.customerType}
                   onValueChange={(value) =>
-                    setCustomerForm((prev) => ({
-                      ...prev,
-                      customerType: value,
-                    }))
+                    handleCustomerFieldChange("customerType", value)
                   }
                 >
                   <SelectTrigger>
@@ -313,11 +261,8 @@ export function SalesManagement() {
                 <Input
                   type="email"
                   value={customerForm.email}
-                  onChange={(e) =>
-                    setCustomerForm((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
+                  onChange={(event) =>
+                    handleCustomerFieldChange("email", event.target.value)
                   }
                   placeholder="email@example.com"
                 />
@@ -326,11 +271,8 @@ export function SalesManagement() {
                 <Label>Address</Label>
                 <Input
                   value={customerForm.address}
-                  onChange={(e) =>
-                    setCustomerForm((prev) => ({
-                      ...prev,
-                      address: e.target.value,
-                    }))
+                  onChange={(event) =>
+                    handleCustomerFieldChange("address", event.target.value)
                   }
                   placeholder="Customer address"
                 />
@@ -341,86 +283,46 @@ export function SalesManagement() {
             <Button variant="outline" onClick={() => setShowNewCustomer(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateCustomer} disabled={submitting}>
-              {submitting ? "Creating..." : "Add Customer"}
+            <Button
+              onClick={() => {
+                void handleCreateCustomer();
+              }}
+              disabled={isCreatingCustomer}
+            >
+              {isCreatingCustomer ? "Creating..." : "Add Customer"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Sales Overview */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              Today&apos;s Sales
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              ₦{todayTotal.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {todaySales.length} transactions today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              Eggs Sold Today
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {Math.floor(todayEggs / 12)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {todayEggs} individual eggs
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              Pending Payments
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              ₦{pendingPayments.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {pendingCount} transaction{pendingCount !== 1 ? "s" : ""}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">
-              Total Customers
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl sm:text-2xl font-bold">
-              {customers.length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Registered customers
-            </p>
-          </CardContent>
-        </Card>
+        <SummaryCard
+          title="Today's Sales"
+          value={`₦${summary.todayRevenue.toLocaleString()}`}
+          description={`${summary.todaySalesCount} transactions today`}
+          icon={DollarSign}
+        />
+        <SummaryCard
+          title="Eggs Sold Today"
+          value={String(Math.floor(summary.todayEggs / 12))}
+          description={`${summary.todayEggs} individual eggs`}
+          icon={DollarSign}
+        />
+        <SummaryCard
+          title="Pending Payments"
+          value={`₦${summary.pendingPayments.toLocaleString()}`}
+          description={`${summary.pendingCount} transaction${summary.pendingCount !== 1 ? "s" : ""}`}
+          icon={DollarSign}
+        />
+        <SummaryCard
+          title="Total Customers"
+          value={String(summary.totalCustomers)}
+          description="Registered customers"
+          icon={Users}
+        />
       </div>
 
-      <div className="grid gap-4 lg:gap-6 lg:grid-cols-3">
-        {/* Sales Form */}
+      <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {showNewSale && (
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -438,7 +340,7 @@ export function SalesManagement() {
                   <Select
                     value={saleForm.customerId}
                     onValueChange={(value) =>
-                      setSaleForm((prev) => ({ ...prev, customerId: value }))
+                      handleSaleFieldChange("customerId", value)
                     }
                   >
                     <SelectTrigger>
@@ -461,11 +363,8 @@ export function SalesManagement() {
                   <Input
                     type="date"
                     value={saleForm.saleDate}
-                    onChange={(e) =>
-                      setSaleForm((prev) => ({
-                        ...prev,
-                        saleDate: e.target.value,
-                      }))
+                    onChange={(event) =>
+                      handleSaleFieldChange("saleDate", event.target.value)
                     }
                   />
                 </div>
@@ -474,7 +373,7 @@ export function SalesManagement() {
               <Separator className="opacity-60" />
 
               <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
-                <Label className="text-sm sm:text-base font-medium">
+                <Label className="text-sm font-medium sm:text-base">
                   Egg Quantity & Pricing
                 </Label>
 
@@ -485,11 +384,8 @@ export function SalesManagement() {
                       type="number"
                       placeholder="0"
                       value={saleForm.quantity}
-                      onChange={(e) =>
-                        setSaleForm((prev) => ({
-                          ...prev,
-                          quantity: e.target.value,
-                        }))
+                      onChange={(event) =>
+                        handleSaleFieldChange("quantity", event.target.value)
                       }
                     />
                   </div>
@@ -499,21 +395,20 @@ export function SalesManagement() {
                       type="number"
                       placeholder="0"
                       value={saleForm.pricePerEgg}
-                      onChange={(e) =>
-                        setSaleForm((prev) => ({
-                          ...prev,
-                          pricePerEgg: e.target.value,
-                        }))
+                      onChange={(event) =>
+                        handleSaleFieldChange(
+                          "pricePerEgg",
+                          event.target.value,
+                        )
                       }
                     />
                   </div>
                 </div>
 
-                {/* Total Display */}
                 <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/45 p-3">
                   <span className="font-medium">Total Amount:</span>
                   <span className="display-heading text-3xl leading-none">
-                    ₦{calculateTotal().toLocaleString()}
+                    ₦{saleTotal.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -524,7 +419,7 @@ export function SalesManagement() {
                   <Select
                     value={saleForm.paymentMethod}
                     onValueChange={(value) =>
-                      setSaleForm((prev) => ({ ...prev, paymentMethod: value }))
+                      handleSaleFieldChange("paymentMethod", value)
                     }
                   >
                     <SelectTrigger>
@@ -542,7 +437,7 @@ export function SalesManagement() {
                   <Select
                     value={saleForm.paymentStatus}
                     onValueChange={(value) =>
-                      setSaleForm((prev) => ({ ...prev, paymentStatus: value }))
+                      handleSaleFieldChange("paymentStatus", value)
                     }
                   >
                     <SelectTrigger>
@@ -556,7 +451,7 @@ export function SalesManagement() {
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
                 <Button
                   variant="outline"
                   onClick={() => setShowNewSale(false)}
@@ -566,27 +461,24 @@ export function SalesManagement() {
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={handleCreateSale}
-                  disabled={submitting}
+                  onClick={() => {
+                    void handleCreateSale();
+                  }}
+                  disabled={isCreatingSale}
                 >
-                  {submitting ? "Recording..." : "Record Sale"}
+                  {isCreatingSale ? "Recording..." : "Record Sale"}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Recent Sales */}
         <Card className={showNewSale ? "lg:col-span-1" : "lg:col-span-3"}>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="display-heading text-2xl">
-                  Recent Sales
-                </CardTitle>
-                <CardDescription>Latest sales transactions</CardDescription>
-              </div>
-            </div>
+            <CardTitle className="display-heading text-2xl">
+              Recent Sales
+            </CardTitle>
+            <CardDescription>Latest sales transactions</CardDescription>
           </CardHeader>
           <CardContent>
             {sales.length > 0 ? (
@@ -602,39 +494,13 @@ export function SalesManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.slice(0, 10).map((sale) => {
-                    const totalEggs = Number(sale.quantity) || 0;
-                    return (
-                      <TableRow key={sale.id}>
-                        <TableCell className="font-medium">
-                          #{sale.id}
-                        </TableCell>
-                        <TableCell>
-                          {sale.customer?.customerName || "Unknown"}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(sale.saleDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {totalEggs} ({Math.floor(totalEggs / 12)} dz)
-                        </TableCell>
-                        <TableCell>
-                          ₦{Number(sale.totalAmount).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              sale.paymentStatus === "paid"
-                                ? "default"
-                                : "destructive"
-                            }
-                          >
-                            {sale.paymentStatus}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {sales.slice(0, 10).map((sale) => (
+                    <SaleRow
+                      key={sale.id}
+                      sale={sale}
+                      customer={customerNames.get(sale.customerId)}
+                    />
+                  ))}
                 </TableBody>
               </Table>
             ) : (
@@ -652,7 +518,6 @@ export function SalesManagement() {
         </Card>
       </div>
 
-      {/* Customer Management */}
       <Card>
         <CardHeader>
           <CardTitle className="display-heading text-2xl">
@@ -662,29 +527,9 @@ export function SalesManagement() {
         </CardHeader>
         <CardContent>
           {customers.length > 0 ? (
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
               {customers.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="font-medium text-sm sm:text-base truncate">
-                      {customer.customerName}
-                    </h4>
-                    <Badge variant="outline" className="flex-shrink-0 text-xs">
-                      {customer.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {customer.phone || "No phone"}
-                  </p>
-                  {customer.email && (
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {customer.email}
-                    </p>
-                  )}
-                </div>
+                <CustomerCard key={customer.id} customer={customer} />
               ))}
             </div>
           ) : (
@@ -700,6 +545,81 @@ export function SalesManagement() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  icon: typeof DollarSign;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xs font-medium sm:text-sm">{title}</CardTitle>
+        <Icon className="hidden h-4 w-4 text-muted-foreground sm:block" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-xl font-bold sm:text-2xl">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SaleRow({
+  sale,
+  customer,
+}: {
+  sale: Sale;
+  customer?: Customer;
+}) {
+  const totalEggs = Number(sale.quantity) || 0;
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium">#{sale.id}</TableCell>
+      <TableCell>{sale.customer?.customerName || customer?.customerName || "Unknown"}</TableCell>
+      <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
+      <TableCell>
+        {totalEggs} ({Math.floor(totalEggs / 12)} dz)
+      </TableCell>
+      <TableCell>₦{Number(sale.totalAmount).toLocaleString()}</TableCell>
+      <TableCell>
+        <Badge variant={sale.paymentStatus === "paid" ? "default" : "destructive"}>
+          {sale.paymentStatus}
+        </Badge>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function CustomerCard({ customer }: { customer: Customer }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="truncate text-sm font-medium sm:text-base">
+          {customer.customerName}
+        </h4>
+        <Badge variant="outline" className="shrink-0 text-xs">
+          {customer.isActive ? "Active" : "Inactive"}
+        </Badge>
+      </div>
+      <p className="truncate text-xs text-muted-foreground sm:text-sm">
+        {customer.phone || "No phone"}
+      </p>
+      {customer.email && (
+        <p className="truncate text-xs text-muted-foreground sm:text-sm">
+          {customer.email}
+        </p>
+      )}
     </div>
   );
 }

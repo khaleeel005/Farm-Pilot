@@ -1,4 +1,4 @@
-import { House } from './house';
+import type { House } from './house';
 
 /**
  * DailyLog - Matches backend DailyLog model exactly

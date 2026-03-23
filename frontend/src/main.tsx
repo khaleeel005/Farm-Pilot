@@ -1,4 +1,5 @@
 import React from "react";
+import { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -26,6 +27,7 @@ const queryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   context: {
+    queryClient,
     user: null,
   } as RouterContext,
   defaultPreload: "intent",
@@ -41,6 +43,10 @@ declare module "@tanstack/react-router" {
 function InnerApp() {
   const { user, loading } = useUser();
 
+  useEffect(() => {
+    void router.invalidate();
+  }, [user]);
+
   // Wait for user session to be restored before rendering routes
   // This prevents the auth guard from redirecting to login during initial load
   if (loading) {
@@ -54,7 +60,7 @@ function InnerApp() {
     );
   }
 
-  return <RouterProvider router={router} context={{ user }} />;
+  return <RouterProvider router={router} context={{ queryClient, user }} />;
 }
 
 const root = ReactDOM.createRoot(
