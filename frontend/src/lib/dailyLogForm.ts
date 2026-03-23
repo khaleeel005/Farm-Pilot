@@ -24,6 +24,14 @@ export interface FeedBagValidationResult {
   isValid: boolean;
 }
 
+export interface DailyEntrySubmitState {
+  feedBagsError: string;
+  hasSelectedHouse: boolean;
+  isFeedInventoryLoading: boolean;
+  isFormValid: boolean;
+  isSubmitting: boolean;
+}
+
 export function getSelectedBatchUsage(
   batchUsageStats: BatchUsageStats[],
   feedBatchId: string,
@@ -38,6 +46,53 @@ export function getSelectedBatchUsage(
   }
 
   return batchUsageStats.find((stats) => stats.batchId === batchId) ?? null;
+}
+
+export function hasNoAvailableHouses(
+  totalHouses: number,
+  housesLoading: boolean,
+): boolean {
+  return totalHouses === 0 && !housesLoading;
+}
+
+export function isFeedBatchFinished(
+  usageInfo: BatchUsageStats | undefined,
+): boolean {
+  return Boolean(usageInfo && usageInfo.remainingBags <= 0);
+}
+
+export function shouldShowFeedBatchUsageInfo(
+  usageInfo: BatchUsageStats | undefined,
+): usageInfo is BatchUsageStats {
+  return Boolean(usageInfo);
+}
+
+export function shouldShowLowFeedBatchBadge(
+  usageInfo: BatchUsageStats | undefined,
+): boolean {
+  if (!usageInfo) {
+    return false;
+  }
+
+  return !isFeedBatchFinished(usageInfo) && usageInfo.usagePercentage >= 80;
+}
+
+export function getFeedBatchNameClassName(
+  isFinished: boolean,
+): string {
+  return isFinished ? "text-gray-400 line-through" : "";
+}
+
+export function getFeedBatchMetaTextClassName(
+  isFinished: boolean,
+): string {
+  return isFinished ? "text-gray-400" : "text-muted-foreground";
+}
+
+export function getFeedBatchRemainingBagsClassName(
+  isFinished: boolean,
+): string {
+  return isFinished ? "text-gray-400" : "text-blue-600";
 }
 
 export function validateFeedBagUsage(
@@ -96,4 +151,51 @@ export function buildDailyLogUpdatePayload(
     mortalityCount: Number.parseInt(formData.mortalityCount, 10) || 0,
     notes: formData.notes || undefined,
   };
+}
+
+export function isDailyEntryFormValid(input: {
+  feedBagsError: string;
+  hasSelectedHouse: boolean;
+  isFeedBagUsageValid: boolean;
+}): boolean {
+  return (
+    input.hasSelectedHouse &&
+    input.isFeedBagUsageValid &&
+    input.feedBagsError.length === 0
+  );
+}
+
+export function getFeedBagsInputClassName(input: {
+  feedBagsError: string;
+  isFeedBagUsageValid: boolean;
+}): string {
+  return input.feedBagsError || !input.isFeedBagUsageValid
+    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+    : "";
+}
+
+export function getDailyEntrySubmitLabel(
+  submitState: DailyEntrySubmitState,
+): string {
+  if (submitState.isSubmitting) {
+    return "Submitting...";
+  }
+
+  if (submitState.isFeedInventoryLoading) {
+    return "Loading Feed Inventory...";
+  }
+
+  if (submitState.isFormValid) {
+    return "Submit Daily Entry";
+  }
+
+  if (submitState.feedBagsError) {
+    return "Fix Feed Bags Error to Submit";
+  }
+
+  if (!submitState.hasSelectedHouse) {
+    return "Select a House to Submit";
+  }
+
+  return "Fix Errors to Submit";
 }
