@@ -27,6 +27,12 @@ export interface FeedCostEstimate {
   costPerKg?: number;
 }
 
+export interface FeedBatchDeleteConfirm {
+  batchId?: number;
+  batchName?: string;
+  show: boolean;
+}
+
 export function createEmptyIngredientInput(): IngredientInput {
   return {
     ingredientName: "",
@@ -89,4 +95,30 @@ export function validateFeedBatchForm(formData: FeedBatchFormData) {
   }
 
   return errors;
+}
+
+export function extractFeedCostEstimate(
+  response: Record<string, unknown>,
+): FeedCostEstimate | null {
+  return (response.data as FeedCostEstimate) || (response as FeedCostEstimate);
+}
+
+export function formatFeedCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    minimumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function getUsageBarClassName(usagePercentage: number): string {
+  if (usagePercentage > 90) {
+    return "bg-red-500";
+  }
+
+  if (usagePercentage > 70) {
+    return "bg-yellow-500";
+  }
+
+  return "bg-green-500";
 }

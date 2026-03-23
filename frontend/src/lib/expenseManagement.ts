@@ -35,6 +35,11 @@ export interface ExpenseMetrics {
   averageDailyExpense: number;
 }
 
+export interface ExpenseSelectOption {
+  label: string;
+  value: string;
+}
+
 export function createEmptyCostEntry(): Partial<CostEntry> {
   return {
     date: new Date().toISOString().split("T")[0],
@@ -43,6 +48,85 @@ export function createEmptyCostEntry(): Partial<CostEntry> {
     amount: 0,
     category: "operational",
   };
+}
+
+export function getExpenseDateValue(entry: Partial<CostEntry>): string {
+  return entry.date ?? "";
+}
+
+export function getExpenseCostTypeValue(entry: Partial<CostEntry>): string {
+  return entry.costType ?? "";
+}
+
+export function getExpenseDescriptionValue(entry: Partial<CostEntry>): string {
+  return entry.description ?? "";
+}
+
+export function getExpenseAmountValue(entry: Partial<CostEntry>): number {
+  return entry.amount ?? 0;
+}
+
+export function getExpenseCategoryValue(
+  entry: Partial<CostEntry>,
+): NonNullable<CostEntry["category"]> {
+  return entry.category ?? "operational";
+}
+
+export function getExpenseVendorValue(entry: Partial<CostEntry>): string {
+  return entry.vendor ?? "";
+}
+
+export function getExpenseNotesValue(entry: Partial<CostEntry>): string {
+  return entry.notes ?? "";
+}
+
+export function parseExpenseAmountInput(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function buildCostTypeSelectOptions(
+  costTypes: CostTypeOption[],
+): ExpenseSelectOption[] {
+  return [
+    { value: "", label: "Select cost type" },
+    ...costTypes.map((type) => ({
+      value: type.value,
+      label: type.label,
+    })),
+  ];
+}
+
+export function buildExpenseCategoryOptions(): ExpenseSelectOption[] {
+  return [
+    { value: "operational", label: "Operational" },
+    { value: "capital", label: "Capital" },
+    { value: "emergency", label: "Emergency" },
+  ];
+}
+
+export function getExpenseSubmitButtonLabel(loading: boolean): string {
+  return loading ? "Adding..." : "Add Expense";
+}
+
+export function shouldShowSubmittedBy(userRole: "owner" | "staff"): boolean {
+  return userRole === "owner";
+}
+
+export function getExpenseListDescription(
+  userRole: "owner" | "staff",
+): string {
+  return shouldShowSubmittedBy(userRole)
+    ? "All farm expenses with searchable records"
+    : "Your submitted expenses and their documentation quality";
+}
+
+export function getExpenseReceiptLabel(receipt: string | null): string {
+  return receipt ? `Receipt #${receipt}` : "-";
+}
+
+export function getExpenseRowKey(expense: ExpenseRecord): string | number {
+  return expense.id ?? `${expense.date}-${expense.description}`;
 }
 
 export function getCurrentMonthRange(baseDate = new Date()): ExpenseMonthRange {
