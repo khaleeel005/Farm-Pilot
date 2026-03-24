@@ -66,5 +66,5 @@ jobs:
             "cd /var/www/farmapp && \
              pnpm install --prod --frozen-lockfile && \
              NODE_ENV=production npx sequelize-cli db:migrate && \
-             pm2 restart farm-app || pm2 start dist/server.js --name farm-app && \
+             pm2 restart farm-app --update-env || pm2 start dist/server.js --name farm-app && \
              pm2 save"
