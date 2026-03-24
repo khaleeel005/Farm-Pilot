@@ -57,40 +57,59 @@ function parseDialect(raw: string): SupportedDialect {
   throw new Error('DB_DIALECT must be either "postgres" or "sqlite"');
 }
 
-function readDatabaseEnv(): DatabaseEnv {
-  const dbDialect = parseDialect(requireEnv('DB_DIALECT'));
-  const dbLogSql = parseBool(requireEnv('DB_LOG'), 'DB_LOG');
-  const databaseUrl = process.env.DATABASE_URL;
+function parseSslConfig(raw: string | undefined): DatabaseEnv['dbSsl'] {
+  if (raw === 'false') return false;
+  if (raw === 'true') {
+    return { require: true, rejectUnauthorized: false };
+  }
+  return undefined;
+}
 
-  const dbSsl =
-    process.env.DB_SSL === 'false'
-      ? false
-      : process.env.DB_SSL === 'true'
-        ? { require: true as const, rejectUnauthorized: false as const }
-        : undefined;
+function readBaseDatabaseEnv() {
+  return {
+    databaseUrl: process.env.DATABASE_URL,
+    dbDialect: parseDialect(requireEnv('DB_DIALECT')),
+    dbLogSql: parseBool(requireEnv('DB_LOG'), 'DB_LOG'),
+    dbSsl: parseSslConfig(process.env.DB_SSL),
+  };
+}
 
-  if (dbDialect === 'sqlite') {
+function readSqliteDatabaseEnv(baseEnv: ReturnType<typeof readBaseDatabaseEnv>): DatabaseEnv {
+  return {
+    ...baseEnv,
+    dbStorage: requireEnv('DB_STORAGE'),
+  };
+}
+
+function readPostgresDatabaseEnv(baseEnv: ReturnType<typeof readBaseDatabaseEnv>): DatabaseEnv {
+  if (baseEnv.databaseUrl) {
     return {
-      databaseUrl,
-      dbDialect,
-      dbLogSql,
-      dbStorage: requireEnv('DB_STORAGE'),
-      dbSsl,
+      ...baseEnv,
     };
   }
 
   return {
-    databaseUrl,
-    dbName: databaseUrl ? undefined : requireEnv('DB_NAME'),
-    dbUser: databaseUrl ? undefined : requireEnv('DB_USER'),
-    dbPassword: databaseUrl ? undefined : requireEnv('DB_PASSWORD'),
-    dbHost: databaseUrl ? undefined : requireEnv('DB_HOST'),
-    dbPort: databaseUrl ? undefined : parsePort(requireEnv('DB_PORT'), 'DB_PORT'),
-    dbDialect,
-    dbLogSql,
-    dbMaintenanceDb: databaseUrl ? undefined : requireEnv('DB_MAINTENANCE_DB'),
-    dbSsl,
+    ...baseEnv,
+    dbName: requireEnv('DB_NAME'),
+    dbUser: requireEnv('DB_USER'),
+    dbPassword: requireEnv('DB_PASSWORD'),
+    dbHost: requireEnv('DB_HOST'),
+    dbPort: parsePort(requireEnv('DB_PORT'), 'DB_PORT'),
+    dbMaintenanceDb: requireEnv('DB_MAINTENANCE_DB'),
   };
+}
+
+const databaseEnvReaders: Record<
+  SupportedDialect,
+  (baseEnv: ReturnType<typeof readBaseDatabaseEnv>) => DatabaseEnv
+> = {
+  postgres: readPostgresDatabaseEnv,
+  sqlite: readSqliteDatabaseEnv,
+};
+
+function readDatabaseEnv(): DatabaseEnv {
+  const baseEnv = readBaseDatabaseEnv();
+  return databaseEnvReaders[baseEnv.dbDialect](baseEnv);
 }
 
 const env = readDatabaseEnv();
@@ -99,37 +118,95 @@ function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-async function ensurePostgresDatabaseExists() {
-  if (env.databaseUrl || env.dbDialect !== 'postgres') return;
-  if (!env.dbName || !env.dbUser || !env.dbHost || !env.dbPort || !env.dbMaintenanceDb) {
-    throw new Error(
-      'Missing required postgres config: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_MAINTENANCE_DB',
-    );
+function shouldEnsurePostgresDatabase(config: DatabaseEnv): boolean {
+  return !config.databaseUrl && config.dbDialect === 'postgres';
+}
+
+function assertPostgresMaintenanceConfig(
+  config: DatabaseEnv,
+): asserts config is DatabaseEnv & {
+  dbName: string;
+  dbUser: string;
+  dbHost: string;
+  dbPort: number;
+  dbMaintenanceDb: string;
+} {
+  const requiredConfig = [
+    config.dbName,
+    config.dbUser,
+    config.dbHost,
+    config.dbPort,
+    config.dbMaintenanceDb,
+  ];
+
+  if (requiredConfig.every(Boolean)) {
+    return;
   }
 
+  throw new Error(
+    'Missing required postgres config: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_MAINTENANCE_DB',
+  );
+}
+
+function getMaintenanceSslConfig(config: DatabaseEnv) {
+  if (config.dbSsl === false) {
+    return false;
+  }
+
+  if (!config.dbSsl) {
+    return undefined;
+  }
+
+  return { rejectUnauthorized: false };
+}
+
+async function postgresDatabaseExists(client: InstanceType<(typeof import('pg'))['Client']>, name: string) {
+  const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [name]);
+  return result.rowCount !== 0;
+}
+
+async function createDatabaseIfMissing(client: InstanceType<(typeof import('pg'))['Client']>, name: string) {
+  const databaseExists = await postgresDatabaseExists(client, name);
+  if (databaseExists) return;
+
+  logger.info(`Database "${name}" not found. Creating it...`);
+  await client.query(`CREATE DATABASE ${quoteIdentifier(name)}`);
+  logger.info(`✓ Database "${name}" created.`);
+}
+
+async function withPostgresMaintenanceClient(
+  config: DatabaseEnv & {
+    dbName: string;
+    dbUser: string;
+    dbHost: string;
+    dbPort: number;
+    dbMaintenanceDb: string;
+  },
+  callback: (client: InstanceType<(typeof import('pg'))['Client']>) => Promise<void>,
+) {
   const { Client } = await import('pg');
   const client = new Client({
-    host: env.dbHost,
-    port: env.dbPort,
-    user: env.dbUser,
-    password: env.dbPassword,
-    database: env.dbMaintenanceDb,
-    ssl: env.dbSsl === false ? false : env.dbSsl ? { rejectUnauthorized: false } : undefined,
+    host: config.dbHost,
+    port: config.dbPort,
+    user: config.dbUser,
+    password: config.dbPassword,
+    database: config.dbMaintenanceDb,
+    ssl: getMaintenanceSslConfig(config),
   });
 
   await client.connect();
   try {
-    const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [
-      env.dbName,
-    ]);
-    if (result.rowCount === 0) {
-      logger.info(`Database "${env.dbName}" not found. Creating it...`);
-      await client.query(`CREATE DATABASE ${quoteIdentifier(env.dbName)}`);
-      logger.info(`✓ Database "${env.dbName}" created.`);
-    }
+    await callback(client);
   } finally {
     await client.end();
   }
+}
+
+async function ensurePostgresDatabaseExists() {
+  if (!shouldEnsurePostgresDatabase(env)) return;
+
+  assertPostgresMaintenanceConfig(env);
+  await withPostgresMaintenanceClient(env, async (client) => createDatabaseIfMissing(client, env.dbName));
 }
 
 function createSequelizeInstance(config: DatabaseEnv): Sequelize {
@@ -244,74 +321,119 @@ export function initModels(
 // Track if auto-migration has run (for test environment)
 let migrationComplete = false;
 
-export async function autoMigrate() {
-  const isTestEnv = process.env.NODE_ENV === 'test';
-  const preserveTestDb = process.env.TEST_PRESERVE_DB === 'true';
+function shouldSkipRepeatedTestMigration() {
+  return (
+    process.env.NODE_ENV === 'test' &&
+    process.env.TEST_PRESERVE_DB === 'true' &&
+    migrationComplete
+  );
+}
 
-  // Optional opt-in to preserve test database across repeated calls.
-  if (isTestEnv && preserveTestDb && migrationComplete) {
-    return;
+async function authenticateDatabaseForMigration() {
+  await ensurePostgresDatabaseExists();
+  await sequelize.authenticate();
+  logger.info('✓ Database connection authenticated.');
+}
+
+async function loadModelAssociations() {
+  logger.debug('Loading model associations...');
+  await import('../models/associations.js');
+  logger.debug('✓ Model associations loaded.');
+}
+
+function shouldUseCliMigrations() {
+  return process.env.USE_MIGRATIONS === 'true';
+}
+
+function isProductionEnv() {
+  return process.env.NODE_ENV === 'production';
+}
+
+async function runCliMigrations() {
+  const { execSync } = await import('child_process');
+  logger.info('Running migrations via sequelize-cli...');
+  execSync('npx sequelize-cli db:migrate', { stdio: 'inherit' });
+  logger.info('✓ Migrations completed successfully.');
+}
+
+async function runConfiguredMigrations() {
+  if (!shouldUseCliMigrations()) {
+    return false;
   }
 
   try {
-    logger.info('Starting database migration...');
+    await runCliMigrations();
+    migrationComplete = true;
+    return true;
+  } catch (mErr: unknown) {
+    const migrateError = mErr as { message?: string; code?: string };
+    logger.error('Failed to run sequelize migrations:', {
+      message: migrateError.message,
+      code: migrateError.code,
+    });
 
-    // First, authenticate the database connection
-    await ensurePostgresDatabaseExists();
-    await sequelize.authenticate();
-    logger.info('✓ Database connection authenticated.');
-
-    // Import associations to set up model relationships
-    logger.debug('Loading model associations...');
-    await import('../models/associations.js');
-    logger.debug('✓ Model associations loaded.');
-
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (process.env.USE_MIGRATIONS === 'true') {
-      try {
-        const { execSync } = await import('child_process');
-        logger.info('Running migrations via sequelize-cli...');
-        execSync('npx sequelize-cli db:migrate', { stdio: 'inherit' });
-        logger.info('✓ Migrations completed successfully.');
-        migrationComplete = true;
-        return;
-      } catch (mErr: unknown) {
-        const migrateError = mErr as { message?: string; code?: string };
-        logger.error('Failed to run sequelize migrations:', {
-          message: migrateError.message,
-          code: migrateError.code,
-        });
-        if (isProduction) {
-          throw new Error(
-            `Database migrations failed in production: ${migrateError.message || 'unknown error'}`,
-          );
-        }
-        logger.info('Falling back to sequelize.sync...');
-      }
-    }
-
-    if (isProduction) {
+    if (isProductionEnv()) {
       throw new Error(
-        'Refusing to run sequelize.sync in production. Set USE_MIGRATIONS=true and run migrations.',
+        `Database migrations failed in production: ${migrateError.message || 'unknown error'}`,
       );
     }
 
-    // For tests with SQLite, use force: true to avoid index duplication issues
-    // For development (postgres), use alter: true to preserve data
-    const dialect = sequelize.getDialect();
+    logger.info('Falling back to sequelize.sync...');
+    return false;
+  }
+}
 
-    logger.info(`Syncing database with sequelize (dialect: ${dialect})...`);
+function getSyncMode() {
+  return process.env.NODE_ENV === 'test' ? { force: true as const } : { alter: true as const };
+}
 
-    if (isTestEnv) {
-      logger.debug('Using force: true for test environment');
-      await sequelize.sync({ force: true });
-    } else {
-      logger.debug('Using alter: true for development environment');
-      await sequelize.sync({ alter: true });
-    }
+async function syncDatabaseSchema() {
+  if (isProductionEnv()) {
+    throw new Error(
+      'Refusing to run sequelize.sync in production. Set USE_MIGRATIONS=true and run migrations.',
+    );
+  }
 
-    logger.info('✓ Database synchronized successfully.');
-    migrationComplete = true;
+  const dialect = sequelize.getDialect();
+  const syncMode = getSyncMode();
+
+  logger.info(`Syncing database with sequelize (dialect: ${dialect})...`);
+
+  if ('force' in syncMode) {
+    logger.debug('Using force: true for test environment');
+  } else {
+    logger.debug('Using alter: true for development environment');
+  }
+
+  await sequelize.sync(syncMode);
+  logger.info('✓ Database synchronized successfully.');
+  migrationComplete = true;
+}
+
+async function performAutoMigration() {
+  logger.info('Starting database migration...');
+
+  await authenticateDatabaseForMigration();
+  await loadModelAssociations();
+
+  if (await runConfiguredMigrations()) {
+    return;
+  }
+
+  await syncDatabaseSchema();
+}
+
+async function runAutoMigrationIfNeeded() {
+  if (shouldSkipRepeatedTestMigration()) {
+    return;
+  }
+
+  await performAutoMigration();
+}
+
+export async function autoMigrate() {
+  try {
+    await runAutoMigrationIfNeeded();
   } catch (err: unknown) {
     const error = err as { message?: string; code?: string; stack?: string };
     logger.error('Database synchronization failed:', {
