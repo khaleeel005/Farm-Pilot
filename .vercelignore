@@ -24,3 +24,8 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Monorepo separation
+backend/
+.github/
+setup-server*.sh
