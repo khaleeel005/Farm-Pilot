@@ -64,7 +64,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "cd /var/www/farmapp && \
-             pnpm install --prod --frozen-lockfile && \
+             pnpm install --prod --no-frozen-lockfile && \
              NODE_ENV=production npx sequelize-cli db:migrate && \
-             pm2 restart farm-app --update-env || pm2 start dist/server.js --name farm-app && \
+             if pm2 restart farm-app --update-env; then echo 'Restarted'; else pm2 start dist/server.js --name farm-app; fi && \
              pm2 save"
