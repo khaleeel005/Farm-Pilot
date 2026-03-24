@@ -1,0 +1,66 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Setup pnpm + Node ───────────────────────────
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      # ── 3. Install & Build ─────────────────────────────
+      - name: Install dependencies
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript
+        working-directory: backend
+        run: pnpm build
+
+      # ── 4. Deploy to server ────────────────────────────
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync files to server
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'src' \
+            --exclude '*.ts' \
+            --exclude 'node_modules/.cache' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/farmapp/
+
+      - name: Install prod deps & run migrations
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd /var/www/farmapp && \
+             pnpm install --prod --frozen-lockfile && \
+             NODE_ENV=production npx sequelize-cli db:migrate && \
+             pm2 restart farm-app || pm2 start dist/server.js --name farm-app && \
+             pm2 save"
