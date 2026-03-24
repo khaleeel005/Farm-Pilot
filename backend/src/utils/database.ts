@@ -28,6 +28,13 @@ type DatabaseEnv = {
   dbSsl: boolean | { require: true; rejectUnauthorized: false } | undefined;
 };
 
+type DatabaseError = {
+  message?: string;
+  code?: string;
+  details?: unknown;
+  stack?: string;
+};
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -113,6 +120,57 @@ function readDatabaseEnv(): DatabaseEnv {
 }
 
 const env = readDatabaseEnv();
+
+function getConfiguredHostname(config: DatabaseEnv): string | undefined {
+  if (config.dbHost) {
+    return config.dbHost;
+  }
+
+  if (!config.databaseUrl) {
+    return undefined;
+  }
+
+  try {
+    return new URL(config.databaseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function isLikelyPrivateOrIncompleteHostname(hostname: string | undefined): boolean {
+  if (!hostname) {
+    return false;
+  }
+
+  if (hostname === 'localhost' || hostname.includes('.') || hostname.includes(':')) {
+    return false;
+  }
+
+  return !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+}
+
+function getDatabaseTroubleshootingHint(config: DatabaseEnv, error: DatabaseError): string | undefined {
+  const message = error.message || '';
+  const isDnsFailure = error.code === 'ENOTFOUND' || message.includes('ENOTFOUND');
+
+  if (!isDnsFailure) {
+    return undefined;
+  }
+
+  const hostname = getConfiguredHostname(config);
+  if (isLikelyPrivateOrIncompleteHostname(hostname)) {
+    return (
+      `Database host "${hostname}" could not be resolved and may be a private-network-only or incomplete hostname. ` +
+      'Verify that this runtime can reach it and that DATABASE_URL/DB_HOST is using the correct address.'
+    );
+  }
+
+  if (hostname) {
+    return `Database host "${hostname}" could not be resolved. Verify DATABASE_URL/DB_HOST in the deployed environment.`;
+  }
+
+  return 'Database host could not be resolved. Verify DATABASE_URL/DB_HOST in the deployed environment.';
+}
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -277,6 +335,7 @@ export async function connect() {
     logger.debug('Database configuration:', {
       dialect: env.dbDialect,
       host: env.dbHost,
+      parsedHostname: getConfiguredHostname(env),
       port: env.dbPort,
       database: env.dbName,
       hasDatabaseUrl: !!env.databaseUrl,
@@ -289,11 +348,12 @@ export async function connect() {
     }
     return true;
   } catch (err: unknown) {
-    const error = err as { message?: string; code?: string; details?: unknown };
+    const error = err as DatabaseError;
     logger.error('Database connection failed:', {
       message: error.message,
       code: error.code,
       details: error.details,
+      hint: getDatabaseTroubleshootingHint(env, error),
     });
     throw err;
   }
@@ -435,11 +495,12 @@ export async function autoMigrate() {
   try {
     await runAutoMigrationIfNeeded();
   } catch (err: unknown) {
-    const error = err as { message?: string; code?: string; stack?: string };
+    const error = err as DatabaseError;
     logger.error('Database synchronization failed:', {
       message: error.message,
       code: error.code,
       stack: error.stack,
+      hint: getDatabaseTroubleshootingHint(env, error),
     });
     throw err;
   }

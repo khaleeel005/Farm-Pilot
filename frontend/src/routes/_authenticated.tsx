@@ -107,10 +107,10 @@ function AuthenticatedLayout() {
   const RoleIcon = userRole === "owner" ? ShieldCheck : Tractor;
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[17.5rem_1fr]">
+    <div className="min-h-screen lg:grid lg:h-screen lg:grid-cols-[17.5rem_1fr] lg:overflow-hidden">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 border-r border-sidebar-border/70 bg-sidebar/95 text-sidebar-foreground backdrop-blur transition-transform duration-300 ease-out lg:sticky lg:top-0 lg:w-auto lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-72 border-r border-sidebar-border/70 bg-sidebar/95 text-sidebar-foreground backdrop-blur transition-transform duration-300 ease-out lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -133,7 +133,7 @@ function AuthenticatedLayout() {
             </div>
           </div>
 
-          <nav className="mt-6 flex-1 space-y-1 overflow-y-auto pr-1">
+          <nav className="mt-6 flex-1 space-y-1 pr-1">
             {navItems.map((item, index) => {
               const Icon = item.icon;
               const isActive = matchRoute({ to: item.path, fuzzy: false });
@@ -178,7 +178,7 @@ function AuthenticatedLayout() {
         />
       )}
 
-      <div className="min-w-0">
+      <div className="min-w-0 lg:flex lg:h-screen lg:min-h-0 lg:flex-col lg:overflow-hidden">
         <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ function AuthenticatedLayout() {
           </div>
         </header>
 
-        <main className="min-w-0 p-4 sm:p-6 lg:p-7">
+        <main className="min-w-0 p-4 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:p-7">
           <div className="fade-rise rounded-3xl border border-border/60 bg-card/70 p-4 shadow-[0_20px_45px_-28px_oklch(0.2_0.02_50/0.35)] backdrop-blur md:p-6">
             <Outlet />
           </div>
