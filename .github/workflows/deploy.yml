@@ -85,7 +85,7 @@ jobs:
             DB_SSL="${{ vars.DB_SSL || 'false' }}" \
             USE_MIGRATIONS="${{ vars.USE_MIGRATIONS || 'true' }}" \
             LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
-            npx sequelize-cli db:migrate
+            pnpm exec sequelize-cli db:migrate
             
             # Stop existing PM2 app
             pm2 stop farm-app 2>/dev/null || true
@@ -94,7 +94,8 @@ jobs:
             # Install production dependencies only for runtime
             pnpm install --prod --no-frozen-lockfile
             
-            # Start with all environment variables passed directly
+            # Start the app without runtime migrations.
+            # Migrations are handled explicitly in the deploy step above.
             NODE_ENV=production \
             DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             JWT_SECRET="${{ secrets.JWT_SECRET }}" \
@@ -109,7 +110,7 @@ jobs:
             DB_DIALECT="${{ vars.DB_DIALECT || 'postgres' }}" \
             DB_LOG="${{ vars.DB_LOG || 'false' }}" \
             DB_SSL="${{ vars.DB_SSL || 'false' }}" \
-            USE_MIGRATIONS="${{ vars.USE_MIGRATIONS || 'true' }}" \
+            USE_MIGRATIONS="false" \
             LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
             pm2 start dist/server.js --name farm-app
             
