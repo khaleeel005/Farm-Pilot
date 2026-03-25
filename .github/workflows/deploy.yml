@@ -65,8 +65,8 @@ jobs:
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
             cd /var/www/farmapp
             
-            # Install production dependencies
-            pnpm install --prod --no-frozen-lockfile
+            # Install all dependencies (need sequelize-cli for migrations)
+            pnpm install --no-frozen-lockfile
             
             # Run migrations with all env vars
             NODE_ENV=production \
@@ -91,6 +91,9 @@ jobs:
             pm2 stop farm-app 2>/dev/null || true
             pm2 delete farm-app 2>/dev/null || true
             
+            # Install production dependencies only for runtime
+            pnpm install --prod --no-frozen-lockfile
+            
             # Start with all environment variables passed directly
             NODE_ENV=production \
             DATABASE_URL="${{ secrets.DATABASE_URL }}" \
@@ -112,6 +115,9 @@ jobs:
             
             # Save PM2 configuration
             pm2 save
+            
+            # Wait for app to be ready
+            sleep 3
             
             # Show status
             pm2 status
