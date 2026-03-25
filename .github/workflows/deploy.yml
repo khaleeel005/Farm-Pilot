@@ -55,17 +55,67 @@ jobs:
             --exclude 'src' \
             --exclude '*.ts' \
             --exclude 'node_modules/.cache' \
-            --exclude '.env' \
+            --exclude '.env*' \
             -e "ssh -i ~/.ssh/deploy_key" \
             backend/ \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/farmapp/
 
       - name: Install prod deps & run migrations
         run: |
-          ssh -i ~/.ssh/deploy_key \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "cd /var/www/farmapp && \
-             pnpm install --prod --no-frozen-lockfile && \
-             NODE_ENV=production npx sequelize-cli db:migrate && \
-             if pm2 restart farm-app --update-env; then echo 'Restarted'; else pm2 start dist/server.js --name farm-app; fi && \
-             pm2 save"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+            cd /var/www/farmapp
+            
+            # Install production dependencies
+            pnpm install --prod --no-frozen-lockfile
+            
+            # Run migrations with all env vars
+            NODE_ENV=production \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
+            JWT_EXPIRES_IN="${{ vars.JWT_EXPIRES_IN || '24h' }}" \
+            JWT_REFRESH_EXPIRES_IN="${{ vars.JWT_REFRESH_EXPIRES_IN || '7d' }}" \
+            ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            ADMIN_NAME="${{ secrets.ADMIN_NAME }}" \
+            FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
+            PORT="${{ vars.PORT || '8080' }}" \
+            DB_DIALECT="${{ vars.DB_DIALECT || 'postgres' }}" \
+            DB_LOG="${{ vars.DB_LOG || 'false' }}" \
+            DB_SSL="${{ vars.DB_SSL || 'false' }}" \
+            USE_MIGRATIONS="${{ vars.USE_MIGRATIONS || 'true' }}" \
+            LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
+            npx sequelize-cli db:migrate
+            
+            # Stop existing PM2 app
+            pm2 stop farm-app 2>/dev/null || true
+            pm2 delete farm-app 2>/dev/null || true
+            
+            # Start with all environment variables passed directly
+            NODE_ENV=production \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
+            JWT_EXPIRES_IN="${{ vars.JWT_EXPIRES_IN || '24h' }}" \
+            JWT_REFRESH_EXPIRES_IN="${{ vars.JWT_REFRESH_EXPIRES_IN || '7d' }}" \
+            ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            ADMIN_NAME="${{ secrets.ADMIN_NAME }}" \
+            FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
+            PORT="${{ vars.PORT || '8080' }}" \
+            DB_DIALECT="${{ vars.DB_DIALECT || 'postgres' }}" \
+            DB_LOG="${{ vars.DB_LOG || 'false' }}" \
+            DB_SSL="${{ vars.DB_SSL || 'false' }}" \
+            USE_MIGRATIONS="${{ vars.USE_MIGRATIONS || 'true' }}" \
+            LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
+            pm2 start dist/server.js --name farm-app
+            
+            # Save PM2 configuration
+            pm2 save
+            
+            # Show status
+            pm2 status
+            
+            # Show recent logs
+            pm2 logs farm-app --lines 50 --nostream
+          ENDSSH

@@ -23,28 +23,32 @@ const queryClient = new QueryClient({
   },
 });
 
-// Create a new router instance
-const router = createRouter({
-  routeTree,
-  context: {
-    queryClient,
-    user: null,
-  } as RouterContext,
-  defaultPreload: "intent",
-});
+function createAppRouter(user: RouterContext["user"]) {
+  return createRouter({
+    routeTree,
+    context: {
+      queryClient,
+      user,
+    } as RouterContext,
+    defaultPreload: "intent",
+  });
+}
+
+type AppRouter = ReturnType<typeof createAppRouter>;
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router;
+    router: AppRouter;
   }
 }
 
 function InnerApp() {
   const { user, loading } = useUser();
+  const routerRef = React.useRef<AppRouter | null>(null);
 
   useEffect(() => {
-    void router.invalidate();
+    void routerRef.current?.invalidate();
   }, [user]);
 
   // Wait for user session to be restored before rendering routes
@@ -60,7 +64,16 @@ function InnerApp() {
     );
   }
 
-  return <RouterProvider router={router} context={{ queryClient, user }} />;
+  if (!routerRef.current) {
+    routerRef.current = createAppRouter(user);
+  }
+
+  return (
+    <RouterProvider
+      router={routerRef.current}
+      context={{ queryClient, user }}
+    />
+  );
 }
 
 const root = ReactDOM.createRoot(

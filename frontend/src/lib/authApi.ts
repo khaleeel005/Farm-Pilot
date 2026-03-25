@@ -1,6 +1,7 @@
 import { authEvents } from "@/lib/authEvents";
 import {
   API_BASE_URL,
+  clearStoredAuth,
   fetchWithAuth,
   handleResponse,
 } from "@/lib/apiClient";
@@ -45,15 +46,16 @@ export async function logout() {
     }
   }
 
-  localStorage.removeItem("fm_token");
-  localStorage.removeItem("fm_refresh");
-  authEvents.emit("logout");
+  clearStoredAuth(true);
 }
 
 export async function getCurrentUser() {
   try {
     const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/me`);
-    if (res.status === 401) return null;
+    if (res.status === 401) {
+      clearStoredAuth(true);
+      return null;
+    }
 
     const data = await handleResponse<{ user?: unknown; data?: unknown }>(res);
     return data?.user || data?.data || null;

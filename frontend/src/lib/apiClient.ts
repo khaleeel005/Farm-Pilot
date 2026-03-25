@@ -10,6 +10,17 @@ export const API_BASE_URL = API_URL.endsWith("/")
   ? API_URL.slice(0, -1)
   : API_URL;
 
+export function clearStoredAuth(emitLogout = false): void {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem("fm_token");
+  localStorage.removeItem("fm_refresh");
+
+  if (emitLogout) {
+    authEvents.emit("logout");
+  }
+}
+
 function authHeader(): HeadersInit {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("fm_token") : null;
@@ -20,7 +31,12 @@ async function tryRefreshToken(): Promise<boolean> {
   try {
     if (typeof window === "undefined") return false;
     const refresh = localStorage.getItem("fm_refresh");
-    if (!refresh) return false;
+    if (!refresh) {
+      if (localStorage.getItem("fm_token")) {
+        clearStoredAuth(true);
+      }
+      return false;
+    }
 
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: "POST",
@@ -28,7 +44,12 @@ async function tryRefreshToken(): Promise<boolean> {
       body: JSON.stringify({ refreshToken: refresh }),
     });
 
-    if (!res.ok) return false;
+    if (!res.ok) {
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        clearStoredAuth(true);
+      }
+      return false;
+    }
     const body = await res.json().catch(() => ({}));
     const token = body?.token || body?.data?.token;
 
@@ -38,6 +59,7 @@ async function tryRefreshToken(): Promise<boolean> {
       return true;
     }
 
+    clearStoredAuth(true);
     return false;
   } catch {
     return false;
