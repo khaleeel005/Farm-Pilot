@@ -28,36 +28,41 @@ const UserContext = createContext<ContextValue | undefined>(undefined);
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const fetchInFlight = useRef(false);
+  const fetchInFlight = useRef<Promise<boolean> | null>(null);
   const hasInitialized = useRef(false);
 
   const fetchUser = async (): Promise<boolean> => {
     if (fetchInFlight.current) {
-      return false;
+      return fetchInFlight.current;
     }
-    fetchInFlight.current = true;
-    setLoading(true);
-    try {
-      const u = await getCurrentUser() as BackendUser | null;
-      if (u) {
-        setUser({
-          id: u.id,
-          username: u.username,
-          role: u.role === 'owner' ? 'owner' : 'staff',
-          email: u.email,
-        });
-        return true;
-      } else {
+
+    const request = (async () => {
+      setLoading(true);
+      try {
+        const u = await getCurrentUser() as BackendUser | null;
+        if (u) {
+          setUser({
+            id: u.id,
+            username: u.username,
+            role: u.role === 'owner' ? 'owner' : 'staff',
+            email: u.email,
+          });
+          return true;
+        } else {
+          setUser(null);
+          return false;
+        }
+      } catch {
         setUser(null);
         return false;
+      } finally {
+        fetchInFlight.current = null;
+        setLoading(false);
       }
-    } catch {
-      setUser(null);
-      return false;
-    } finally {
-      fetchInFlight.current = false;
-      setLoading(false);
-    }
+    })();
+
+    fetchInFlight.current = request;
+    return request;
   };
 
   useEffect(() => {
