@@ -40,7 +40,7 @@ jobs:
         working-directory: backend
         run: pnpm build
 
-      # ── 4. Deploy to server ────────────────────────────
+      # ── 4. Setup SSH ───────────────────────────────────
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -48,6 +48,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
+      # ── 5. Sync files ──────────────────────────────────
       - name: Sync files to server
         run: |
           rsync -avz --delete \
@@ -60,69 +61,61 @@ jobs:
             backend/ \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/farmapp/
 
-      - name: Install prod deps & run migrations
+      # ── 6. Write .env to server ────────────────────────
+      # Single-quoted ENDSSH blocks GitHub from interpolating ${{ }} inside
+      # the heredoc, so we write the .env in a plain double-quoted call first.
+      - name: Write .env to server
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cat > /var/www/farmapp/.env << 'EOF'
+          NODE_ENV=production
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+          JWT_EXPIRES_IN=${{ vars.JWT_EXPIRES_IN || '24h' }}
+          JWT_REFRESH_EXPIRES_IN=${{ vars.JWT_REFRESH_EXPIRES_IN || '7d' }}
+          ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_NAME=${{ secrets.ADMIN_NAME }}
+          FRONTEND_URL=${{ vars.FRONTEND_URL }}
+          PORT=${{ vars.PORT || '8080' }}
+          DB_DIALECT=${{ vars.DB_DIALECT || 'postgres' }}
+          DB_LOG=${{ vars.DB_LOG || 'false' }}
+          DB_SSL=${{ vars.DB_SSL || 'false' }}
+          USE_MIGRATIONS=false
+          LOG_LEVEL=${{ vars.LOG_LEVEL || 'info' }}
+          EOF"
+
+      # ── 7. Install, migrate & restart ─────────────────
+      - name: Install deps, run migrations & restart app
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
             cd /var/www/farmapp
-            
-            # Install all dependencies (need sequelize-cli for migrations)
+
+            # Install all deps (sequelize-cli needed for migrations)
             pnpm install --no-frozen-lockfile
-            
-            # Run migrations with all env vars
-            NODE_ENV=production \
-            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-            JWT_EXPIRES_IN="${{ vars.JWT_EXPIRES_IN || '24h' }}" \
-            JWT_REFRESH_EXPIRES_IN="${{ vars.JWT_REFRESH_EXPIRES_IN || '7d' }}" \
-            ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
-            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-            ADMIN_NAME="${{ secrets.ADMIN_NAME }}" \
-            FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
-            PORT="${{ vars.PORT || '8080' }}" \
-            DB_DIALECT="${{ vars.DB_DIALECT || 'postgres' }}" \
-            DB_LOG="${{ vars.DB_LOG || 'false' }}" \
-            DB_SSL="${{ vars.DB_SSL || 'false' }}" \
-            USE_MIGRATIONS="${{ vars.USE_MIGRATIONS || 'true' }}" \
-            LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
-            pnpm exec sequelize-cli db:migrate
-            
-            # Stop existing PM2 app
+
+            # Load .env and run migrations
+            set -a; source .env; set +a
+            USE_MIGRATIONS=true pnpm exec sequelize-cli db:migrate
+
+            # Swap to prod-only deps for runtime
+            pnpm install --prod --no-frozen-lockfile
+
+            # Stop and delete existing PM2 process
             pm2 stop farm-app 2>/dev/null || true
             pm2 delete farm-app 2>/dev/null || true
-            
-            # Install production dependencies only for runtime
-            pnpm install --prod --no-frozen-lockfile
-            
-            # Start the app without runtime migrations.
-            # Migrations are handled explicitly in the deploy step above.
-            NODE_ENV=production \
-            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-            JWT_EXPIRES_IN="${{ vars.JWT_EXPIRES_IN || '24h' }}" \
-            JWT_REFRESH_EXPIRES_IN="${{ vars.JWT_REFRESH_EXPIRES_IN || '7d' }}" \
-            ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
-            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-            ADMIN_NAME="${{ secrets.ADMIN_NAME }}" \
-            FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
-            PORT="${{ vars.PORT || '8080' }}" \
-            DB_DIALECT="${{ vars.DB_DIALECT || 'postgres' }}" \
-            DB_LOG="${{ vars.DB_LOG || 'false' }}" \
-            DB_SSL="${{ vars.DB_SSL || 'false' }}" \
-            USE_MIGRATIONS="false" \
-            LOG_LEVEL="${{ vars.LOG_LEVEL || 'info' }}" \
-            pm2 start dist/server.js --name farm-app
-            
-            # Save PM2 configuration
+
+            # Start app — PM2 v5 loads and persists all vars from --env-file
+            pm2 start dist/server.js --name farm-app --env-file .env
             pm2 save
-            
-            # Wait for app to be ready
-            sleep 3
-            
-            # Show status
+
+            # Health check — fail the deploy if app didn't come up
+            sleep 5
+            pm2 show farm-app | grep -q "online" \
+              || { echo "❌ App failed to start"; pm2 logs farm-app --lines 50 --nostream; exit 1; }
+
+            echo "✅ Deploy successful"
             pm2 status
-            
-            # Show recent logs
-            pm2 logs farm-app --lines 50 --nostream
           ENDSSH
