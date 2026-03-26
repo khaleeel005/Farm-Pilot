@@ -60,13 +60,16 @@ describe("House Management Flow", () => {
     const res = await auth(ownerToken)(request(app).post("/api/houses")).send({
       houseName: "House Alpha",
       capacity: 1000,
-      currentBirdCount: 800,
+      initialBirdCount: 800,
       location: "North Wing",
       description: "Main egg production house",
     });
 
     expect([200, 201]).toContain(res.statusCode);
     expect(res.body.data).toHaveProperty("id");
+    expect(res.body.data.initialBirdCount).toBe(800);
+    expect(res.body.data.currentBirdCount).toBe(800);
+    expect(res.body.data.mortalityCount).toBe(0);
     houseId = res.body.data.id;
   });
 
@@ -93,12 +96,13 @@ describe("House Management Flow", () => {
       request(app).put(`/api/houses/${houseId}`)
     ).send({
       houseName: "House Alpha - Updated",
-      currentBirdCount: 850,
+      initialBirdCount: 850,
       description: "Updated main egg production house",
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.houseName).toBe("House Alpha - Updated");
+    expect(res.body.data.initialBirdCount).toBe(850);
     expect(res.body.data.currentBirdCount).toBe(850);
   });
 
@@ -106,7 +110,7 @@ describe("House Management Flow", () => {
     const res = await auth(ownerToken)(request(app).post("/api/houses")).send({
       houseName: "House Beta",
       capacity: 800,
-      currentBirdCount: 600,
+      initialBirdCount: 600,
       location: "South Wing",
     });
 
@@ -126,11 +130,12 @@ describe("House Management Flow", () => {
     const res = await auth(ownerToken)(
       request(app).put(`/api/houses/${houseId}`)
     ).send({
-      currentBirdCount: 900,
+      currentBirdCount: 800,
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.data.currentBirdCount).toBe(900);
+    expect(res.body.data.currentBirdCount).toBe(800);
+    expect(res.body.data.mortalityCount).toBe(50);
   });
 
   test("10. Create house with missing optional fields", async () => {
@@ -141,7 +146,9 @@ describe("House Management Flow", () => {
 
     expect([200, 201]).toContain(res.statusCode);
     expect(res.body.data.capacity).toBe(1000); // Default value
+    expect(res.body.data.initialBirdCount).toBe(0); // Default value
     expect(res.body.data.currentBirdCount).toBe(0); // Default value
+    expect(res.body.data.mortalityCount).toBe(0); // Default value
   });
 
   test("11. Create house with invalid capacity", async () => {
@@ -161,8 +168,7 @@ describe("House Management Flow", () => {
       currentBirdCount: 1500, // Exceeds capacity of 1000
     });
 
-    // This might be allowed depending on validation rules
-    expect([200, 400]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(400);
   });
 
   test("13. Get house statistics", async () => {

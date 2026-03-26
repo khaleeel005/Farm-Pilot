@@ -16,7 +16,9 @@ export interface HouseEntity {
   id: number;
   houseName: string;
   capacity: number;
+  initialBirdCount: number;
   currentBirdCount: number;
+  mortalityCount: number;
   location?: string | null;
   description?: string | null;
   status: "active" | "maintenance" | "inactive";
@@ -208,4 +210,3 @@ export interface BirdCostEntity {
   createdAt?: Date;
   updatedAt?: Date;
 }
-

@@ -4,6 +4,8 @@ import FeedBatch from "../models/FeedBatch.js";
 import logger from "../config/logger.js";
 import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
 import feedBatchStatsService from "./feedBatchStatsService.js";
+import { sequelize } from "../utils/database.js";
+import type { Transaction } from "sequelize";
 import type {
   DailyLogEntity,
   FeedBatchEntity,
@@ -36,8 +38,21 @@ const DAILY_LOG_MUTABLE_FIELDS = [
 type DailyLogMutableField = (typeof DAILY_LOG_MUTABLE_FIELDS)[number];
 type DailyLogWritePayload = Partial<Pick<DailyLogEntity, DailyLogMutableField>>;
 
+const HOUSE_ATTRIBUTES: string[] = [
+  "id",
+  "houseName",
+  "capacity",
+  "initialBirdCount",
+  "currentBirdCount",
+  "mortalityCount",
+  "location",
+  "status",
+] ;
+
 const asDailyLog = (value: unknown): DailyLogRecord | null =>
   value as DailyLogRecord | null;
+
+const asHouse = (value: unknown): HouseEntity | null => value as HouseEntity | null;
 
 const pickDailyLogPayload = (data: DailyLogInput): DailyLogWritePayload => {
   const payload: DailyLogWritePayload = {};
@@ -51,6 +66,71 @@ const pickDailyLogPayload = (data: DailyLogInput): DailyLogWritePayload => {
   }
 
   return payload;
+};
+
+const getMortalityCount = (value: unknown): number => Number(value ?? 0);
+
+const getDailyLogWithRelations = (id: string | number, transaction?: Transaction) =>
+  DailyLog.findByPk(id, {
+    transaction,
+    include: [
+      {
+        model: House,
+        as: "House",
+        attributes: HOUSE_ATTRIBUTES,
+      },
+      {
+        model: FeedBatch,
+        as: "FeedBatch",
+        attributes: [
+          "id",
+          "batchName",
+          "costPerBag",
+          "bagSizeKg",
+          "totalBags",
+        ],
+        required: false,
+      },
+    ],
+  });
+
+const applyHouseMortalityDelta = async (
+  houseId: number,
+  mortalityDelta: number,
+  transaction: Transaction,
+) => {
+  if (!mortalityDelta) {
+    return;
+  }
+
+  const house = asHouse(await House.findByPk(houseId, { transaction }));
+  if (!house) {
+    throw new NotFoundError("House not found");
+  }
+
+  const nextCurrentBirdCount = Number(house.currentBirdCount) - mortalityDelta;
+  const nextMortalityCount = Number(house.mortalityCount) + mortalityDelta;
+
+  if (nextCurrentBirdCount < 0) {
+    throw new BadRequestError(
+      `Mortality count exceeds the current bird count for house ${house.houseName}.`,
+    );
+  }
+
+  if (nextMortalityCount < 0) {
+    throw new BadRequestError("House mortality count cannot be negative.");
+  }
+
+  await House.update(
+    {
+      currentBirdCount: nextCurrentBirdCount,
+      mortalityCount: nextMortalityCount,
+    },
+    {
+      where: { id: houseId },
+      transaction,
+    },
+  );
 };
 
 const dailyLogService = {
@@ -130,81 +210,47 @@ const dailyLogService = {
         `Updating existing daily log id=${existingLog.id} for house=${payload.houseId} date=${payload.logDate}`,
       );
 
-      const [updatedCount] = await DailyLog.update(payload, {
-        where: { id: existingLog.id },
-      });
+      return sequelize.transaction(async (transaction) => {
+        const currentMortality = getMortalityCount(existingLog.mortalityCount);
+        const nextMortality = getMortalityCount(
+          payload.mortalityCount ?? existingLog.mortalityCount,
+        );
 
-      if (updatedCount > 0) {
-        const updatedLog = await DailyLog.findByPk(existingLog.id, {
-          include: [
-            {
-              model: House,
-              as: "House",
-              attributes: [
-                "id",
-                "houseName",
-                "capacity",
-                "currentBirdCount",
-                "location",
-                "status",
-              ],
-            },
-            {
-              model: FeedBatch,
-              as: "FeedBatch",
-              attributes: [
-                "id",
-                "batchName",
-                "costPerBag",
-                "bagSizeKg",
-                "totalBags",
-              ],
-              required: false,
-            },
-          ],
+        await applyHouseMortalityDelta(
+          Number(existingLog.houseId),
+          nextMortality - currentMortality,
+          transaction,
+        );
+
+        const [updatedCount] = await DailyLog.update(payload, {
+          where: { id: existingLog.id },
+          transaction,
         });
-        return updatedLog;
-      } else {
-        throw new BadRequestError("Failed to update existing daily log");
-      }
+
+        if (!updatedCount) {
+          throw new BadRequestError("Failed to update existing daily log");
+        }
+
+        return getDailyLogWithRelations(existingLog.id, transaction);
+      });
     } else {
       // Validate feed batch usage for new creation
       await dailyLogService.validateFeedBatchUsage(payload);
 
-      const created = asDailyLog(await DailyLog.create(payload));
-      if (!created) {
-        throw new BadRequestError("Failed to create daily log");
-      }
-      // Fetch the created log with House information
-      const createdWithHouse = await DailyLog.findByPk(created.id, {
-        include: [
-          {
-            model: House,
-            as: "House",
-            attributes: [
-              "id",
-              "houseName",
-              "capacity",
-              "currentBirdCount",
-              "location",
-              "status",
-            ],
-          },
-          {
-            model: FeedBatch,
-            as: "FeedBatch",
-            attributes: [
-              "id",
-              "batchName",
-              "costPerBag",
-              "bagSizeKg",
-              "totalBags",
-            ],
-            required: false,
-          },
-        ],
+      return sequelize.transaction(async (transaction) => {
+        const created = asDailyLog(await DailyLog.create(payload, { transaction }));
+        if (!created) {
+          throw new BadRequestError("Failed to create daily log");
+        }
+
+        await applyHouseMortalityDelta(
+          Number(payload.houseId),
+          getMortalityCount(payload.mortalityCount),
+          transaction,
+        );
+
+        return getDailyLogWithRelations(created.id, transaction);
       });
-      return createdWithHouse;
     }
   },
 
@@ -229,14 +275,7 @@ const dailyLogService = {
         {
           model: House,
           as: "House",
-          attributes: [
-            "id",
-            "houseName",
-            "capacity",
-            "currentBirdCount",
-            "location",
-            "status",
-          ],
+          attributes: HOUSE_ATTRIBUTES,
         },
         {
           model: FeedBatch,
@@ -265,14 +304,7 @@ const dailyLogService = {
         {
           model: House,
           as: "House",
-          attributes: [
-            "id",
-            "houseName",
-            "capacity",
-            "currentBirdCount",
-            "location",
-            "status",
-          ],
+          attributes: HOUSE_ATTRIBUTES,
         },
         {
           model: FeedBatch,
@@ -306,46 +338,64 @@ const dailyLogService = {
     // Validate feed batch usage before updating
     await dailyLogService.validateFeedBatchUsage(payload, id);
 
-    const [updatedCount] = await DailyLog.update(payload, { where: { id } });
-    if (!updatedCount) throw new NotFoundError("Daily log not found");
-    const updated = await DailyLog.findByPk(id, {
-      include: [
-        {
-          model: House,
-          as: "House",
-          attributes: [
-            "id",
-            "houseName",
-            "capacity",
-            "currentBirdCount",
-            "location",
-            "status",
-          ],
-        },
-        {
-          model: FeedBatch,
-          as: "FeedBatch",
-          attributes: [
-            "id",
-            "batchName",
-            "costPerBag",
-            "bagSizeKg",
-            "totalBags",
-          ],
-          required: false,
-        },
-      ],
+    return sequelize.transaction(async (transaction) => {
+      const existingLog = asDailyLog(
+        await DailyLog.findByPk(id, { transaction }),
+      );
+      if (!existingLog) throw new NotFoundError("Daily log not found");
+
+      const currentHouseId = Number(existingLog.houseId);
+      const nextHouseId = Number(payload.houseId ?? existingLog.houseId);
+      const currentMortality = getMortalityCount(existingLog.mortalityCount);
+      const nextMortality = getMortalityCount(
+        payload.mortalityCount ?? existingLog.mortalityCount,
+      );
+
+      if (currentHouseId === nextHouseId) {
+        await applyHouseMortalityDelta(
+          currentHouseId,
+          nextMortality - currentMortality,
+          transaction,
+        );
+      } else {
+        await applyHouseMortalityDelta(
+          currentHouseId,
+          -currentMortality,
+          transaction,
+        );
+        await applyHouseMortalityDelta(nextHouseId, nextMortality, transaction);
+      }
+
+      const [updatedCount] = await DailyLog.update(payload, {
+        where: { id },
+        transaction,
+      });
+      if (!updatedCount) throw new NotFoundError("Daily log not found");
+
+      return getDailyLogWithRelations(id, transaction);
     });
-    return updated;
   },
 
   deleteDailyLog: async (id: string | number | undefined) => {
     if (id === undefined || id === null || id === "") {
       throw new BadRequestError("Daily log id is required");
     }
-    const deleted = await DailyLog.destroy({ where: { id } });
-    if (!deleted) throw new NotFoundError("Daily log not found");
-    return true;
+    return sequelize.transaction(async (transaction) => {
+      const existingLog = asDailyLog(
+        await DailyLog.findByPk(id, { transaction }),
+      );
+      if (!existingLog) throw new NotFoundError("Daily log not found");
+
+      await applyHouseMortalityDelta(
+        Number(existingLog.houseId),
+        -getMortalityCount(existingLog.mortalityCount),
+        transaction,
+      );
+
+      const deleted = await DailyLog.destroy({ where: { id }, transaction });
+      if (!deleted) throw new NotFoundError("Daily log not found");
+      return true;
+    });
   },
 };
 

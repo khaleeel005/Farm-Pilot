@@ -7,7 +7,9 @@ export interface House {
   id: number;
   houseName: string;
   capacity: number;
+  initialBirdCount: number;
   currentBirdCount: number;
+  mortalityCount: number;
   location: string | null;
   description: string | null;
   status: HouseStatus;
@@ -21,7 +23,9 @@ export interface House {
 export interface HousePayload {
   houseName?: string;
   capacity?: number;
+  initialBirdCount?: number;
   currentBirdCount?: number;
+  mortalityCount?: number;
   location?: string;
   description?: string;
   status?: HouseStatus | string;

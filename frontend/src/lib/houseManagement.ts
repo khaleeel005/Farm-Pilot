@@ -6,7 +6,7 @@ const HOUSE_STORAGE_KEY = "farm-pilot-houses";
 export interface HouseFormData {
   name: string;
   capacity: string;
-  currentBirdCount: string;
+  initialBirdCount: string;
   location: string;
   status: House["status"];
   description: string;
@@ -17,6 +17,7 @@ export interface HouseMetrics {
   activeHouses: number;
   totalCapacity: number;
   totalBirds: number;
+  totalMortality: number;
   capacityUsage: number;
 }
 
@@ -24,7 +25,7 @@ export function createEmptyHouseForm(): HouseFormData {
   return {
     name: "",
     capacity: "",
-    currentBirdCount: "",
+    initialBirdCount: "",
     location: "",
     status: HouseStatus.ACTIVE,
     description: "",
@@ -35,7 +36,7 @@ export function createHouseFormData(house: House): HouseFormData {
   return {
     name: house.houseName,
     capacity: String(house.capacity),
-    currentBirdCount: String(house.currentBirdCount),
+    initialBirdCount: String(house.initialBirdCount ?? house.currentBirdCount),
     location: house.location || "",
     status: house.status,
     description: house.description || "",
@@ -46,7 +47,7 @@ export function buildHousePayload(formData: HouseFormData): HousePayload {
   return {
     houseName: formData.name.trim(),
     capacity: Number.parseInt(formData.capacity, 10),
-    currentBirdCount: Number.parseInt(formData.currentBirdCount, 10),
+    initialBirdCount: Number.parseInt(formData.initialBirdCount, 10),
     location: formData.location.trim() || undefined,
     status: formData.status,
     description: formData.description.trim() || undefined,
@@ -59,6 +60,10 @@ export function calculateHouseMetrics(houses: House[]): HouseMetrics {
     (sum, house) => sum + house.currentBirdCount,
     0,
   );
+  const totalMortality = houses.reduce(
+    (sum, house) => sum + house.mortalityCount,
+    0,
+  );
 
   return {
     totalHouses: houses.length,
@@ -66,6 +71,7 @@ export function calculateHouseMetrics(houses: House[]): HouseMetrics {
       .length,
     totalCapacity,
     totalBirds,
+    totalMortality,
     capacityUsage: totalCapacity > 0 ? (totalBirds / totalCapacity) * 100 : 0,
   };
 }
@@ -104,7 +110,16 @@ export function readCachedHouses(): House[] {
     }
 
     const parsedValue = JSON.parse(rawValue);
-    return Array.isArray(parsedValue) ? parsedValue : [];
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return parsedValue.map((house) => ({
+      ...house,
+      initialBirdCount: Number(house.initialBirdCount ?? house.currentBirdCount ?? 0),
+      currentBirdCount: Number(house.currentBirdCount ?? 0),
+      mortalityCount: Number(house.mortalityCount ?? 0),
+    })) as House[];
   } catch {
     return [];
   }

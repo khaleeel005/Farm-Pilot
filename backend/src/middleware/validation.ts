@@ -313,10 +313,18 @@ export const validateCreateHouse = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("capacity must be a positive integer"),
+  body("initialBirdCount")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("initialBirdCount must be non-negative"),
   body("currentBirdCount")
     .optional()
     .isInt({ min: 0 })
     .withMessage("currentBirdCount must be non-negative"),
+  body("mortalityCount")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("mortalityCount must be non-negative"),
   body("location")
     .optional()
     .isLength({ max: 100 })
@@ -339,10 +347,18 @@ export const validateUpdateHouse = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("capacity must be a positive integer"),
+  body("initialBirdCount")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("initialBirdCount must be non-negative"),
   body("currentBirdCount")
     .optional()
     .isInt({ min: 0 })
     .withMessage("currentBirdCount must be non-negative"),
+  body("mortalityCount")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("mortalityCount must be non-negative"),
   body("location")
     .optional()
     .isLength({ max: 100 })

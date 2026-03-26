@@ -104,8 +104,8 @@ export function HouseManagement() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!formData.name || !formData.capacity || !formData.currentBirdCount) {
-      toast.error("House name, capacity, and current birds are required.");
+    if (!formData.name || !formData.capacity || !formData.initialBirdCount) {
+      toast.error("House name, capacity, and initial birds are required.");
       return;
     }
 
@@ -163,7 +163,7 @@ export function HouseManagement() {
   const isFormInvalid =
     !formData.name.trim() ||
     !formData.capacity.trim() ||
-    !formData.currentBirdCount.trim();
+    !formData.initialBirdCount.trim();
 
   if (loading && houses.length === 0) {
     return <LoadingSpinner fullPage message="Loading houses..." />;
@@ -230,14 +230,14 @@ export function HouseManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="currentBirdCount">Current Birds</Label>
+              <Label htmlFor="initialBirdCount">Initial Birds</Label>
               <Input
-                id="currentBirdCount"
+                id="initialBirdCount"
                 type="number"
                 placeholder="500"
-                value={formData.currentBirdCount}
+                value={formData.initialBirdCount}
                 onChange={(event) =>
-                  handleFieldChange("currentBirdCount", event.target.value)
+                  handleFieldChange("initialBirdCount", event.target.value)
                 }
               />
             </div>
@@ -337,7 +337,7 @@ export function HouseManagement() {
         actions={headerActions}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -384,6 +384,22 @@ export function HouseManagement() {
             </p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Recorded Mortality
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="display-heading text-3xl leading-none">
+              {metrics.totalMortality.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              birds lost across houses
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -411,7 +427,9 @@ export function HouseManagement() {
                   <TableHead>House Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Capacity</TableHead>
+                  <TableHead>Initial Birds</TableHead>
                   <TableHead>Current Birds</TableHead>
+                  <TableHead>Mortality</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -429,6 +447,7 @@ export function HouseManagement() {
                       </div>
                     </TableCell>
                     <TableCell>{house.capacity.toLocaleString()}</TableCell>
+                    <TableCell>{house.initialBirdCount.toLocaleString()}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {house.currentBirdCount.toLocaleString()}
@@ -438,6 +457,7 @@ export function HouseManagement() {
                         </Badge>
                       </div>
                     </TableCell>
+                    <TableCell>{house.mortalityCount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge className={getHouseStatusColor(house.status)}>
                         {house.status}

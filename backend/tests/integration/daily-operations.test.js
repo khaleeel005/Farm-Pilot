@@ -40,7 +40,7 @@ describe("Daily Operations Flow", () => {
     const house = await House.create({
       houseName: "Operations Test House",
       capacity: 1000,
-      currentBirdCount: 850,
+      initialBirdCount: 850,
     });
     houseId = house.id;
 
@@ -101,7 +101,8 @@ describe("Daily Operations Flow", () => {
     if (res.statusCode === 201 || res.statusCode === 200) {
       expect(res.body.data).toHaveProperty("id");
       dailyLogId = res.body.data.id;
-      // Daily log created with ID: dailyLogId
+      expect(res.body.data.House.currentBirdCount).toBe(848);
+      expect(res.body.data.House.mortalityCount).toBe(2);
     }
   });
 
@@ -136,11 +137,14 @@ describe("Daily Operations Flow", () => {
       request(app).put(`/api/daily-logs/${dailyLogId}`)
     ).send({
       eggsCollected: 165,
+      mortalityCount: 3,
       notes: "Updated production numbers",
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.eggsCollected).toBe(165);
+    expect(res.body.data.House.currentBirdCount).toBe(847);
+    expect(res.body.data.House.mortalityCount).toBe(3);
   });
 
   test("7. Create multiple daily logs for different dates", async () => {
@@ -155,7 +159,7 @@ describe("Daily Operations Flow", () => {
         eggsCollected: Math.floor(Math.random() * 80) + 100,
         feedBatchId: feedBatchId,
         feedBagsUsed: Math.floor(Math.random() * 3) + 1,
-        mortalityCount: Math.floor(Math.random() * 3),
+        mortalityCount: 0,
         notes: `Production log for ${date}`,
       });
 
@@ -264,14 +268,9 @@ describe("Daily Operations Flow", () => {
     );
 
     if (getHouseRes.statusCode === 200) {
-      const originalCount = getHouseRes.body.data.currentBirdCount;
-
-      // Simulate mortality impact
-      const totalMortality = 2; // From our test logs
-      const expectedCount = originalCount - totalMortality;
-
-      // This would typically be handled by business logic
-      expect(originalCount).toBe(850);
+      expect(getHouseRes.body.data.initialBirdCount).toBe(850);
+      expect(getHouseRes.body.data.currentBirdCount).toBe(847);
+      expect(getHouseRes.body.data.mortalityCount).toBe(3);
     }
   });
 
@@ -289,6 +288,14 @@ describe("Daily Operations Flow", () => {
     );
 
     expect(res.statusCode).toBe(404);
+
+    const getHouseRes = await auth(supervisorToken)(
+      request(app).get(`/api/houses/${houseId}`)
+    );
+
+    expect(getHouseRes.statusCode).toBe(200);
+    expect(getHouseRes.body.data.currentBirdCount).toBe(850);
+    expect(getHouseRes.body.data.mortalityCount).toBe(0);
   });
 
   test("18. Test concurrent daily log creation", async () => {

@@ -17,7 +17,17 @@ const House = sequelize.define("House", {
     allowNull: false,
     defaultValue: 1000,
   },
+  initialBirdCount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
   currentBirdCount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  mortalityCount: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0,
