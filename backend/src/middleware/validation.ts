@@ -369,6 +369,27 @@ export const validateUpdateHouse = [
     .withMessage("description max 500 chars"),
 ];
 
+export const validateCreateBirdBatch = [
+  param("id").isInt({ min: 1 }).withMessage("House ID must be a positive integer"),
+  body("batchName")
+    .notEmpty()
+    .withMessage("batchName is required")
+    .isLength({ max: 80 })
+    .withMessage("batchName max 80 chars"),
+  body("placedAt")
+    .notEmpty()
+    .withMessage("placedAt is required")
+    .isISO8601()
+    .withMessage("placedAt must be a valid date"),
+  body("initialBirdCount")
+    .isInt({ min: 0 })
+    .withMessage("initialBirdCount must be non-negative"),
+  body("notes")
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage("notes max 500 chars"),
+];
+
 // Helper to run validationResult and return 400 if errors
 export const handleValidation = (
   req: Request,

@@ -10,6 +10,13 @@ export interface CreateDailyLogPayload {
   notes?: string;
 }
 
+export interface CreateBirdBatchPayload {
+  batchName: string;
+  placedAt: string;
+  initialBirdCount: number;
+  notes?: string;
+}
+
 export interface CreateSalePayload {
   customerId?: string;
   customer: string;

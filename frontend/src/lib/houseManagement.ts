@@ -6,10 +6,16 @@ const HOUSE_STORAGE_KEY = "farm-pilot-houses";
 export interface HouseFormData {
   name: string;
   capacity: string;
-  initialBirdCount: string;
   location: string;
   status: House["status"];
   description: string;
+}
+
+export interface BirdBatchFormData {
+  batchName: string;
+  placedAt: string;
+  initialBirdCount: string;
+  notes: string;
 }
 
 export interface HouseMetrics {
@@ -25,10 +31,18 @@ export function createEmptyHouseForm(): HouseFormData {
   return {
     name: "",
     capacity: "",
-    initialBirdCount: "",
     location: "",
     status: HouseStatus.ACTIVE,
     description: "",
+  };
+}
+
+export function createEmptyBirdBatchForm(today: string): BirdBatchFormData {
+  return {
+    batchName: "",
+    placedAt: today,
+    initialBirdCount: "",
+    notes: "",
   };
 }
 
@@ -36,7 +50,6 @@ export function createHouseFormData(house: House): HouseFormData {
   return {
     name: house.houseName,
     capacity: String(house.capacity),
-    initialBirdCount: String(house.initialBirdCount ?? house.currentBirdCount),
     location: house.location || "",
     status: house.status,
     description: house.description || "",
@@ -47,7 +60,6 @@ export function buildHousePayload(formData: HouseFormData): HousePayload {
   return {
     houseName: formData.name.trim(),
     capacity: Number.parseInt(formData.capacity, 10),
-    initialBirdCount: Number.parseInt(formData.initialBirdCount, 10),
     location: formData.location.trim() || undefined,
     status: formData.status,
     description: formData.description.trim() || undefined,

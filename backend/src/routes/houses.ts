@@ -1,7 +1,9 @@
 import express from "express";
 import houseController from "../controllers/houseController.js";
+import birdBatchController from "../controllers/birdBatchController.js";
 import {
   validateCreateHouse,
+  validateCreateBirdBatch,
   validateUpdateHouse,
   validateId,
   handleValidation
@@ -19,8 +21,24 @@ router.get("/", authorize(PERMISSIONS.HOUSES.READ), houseController.getAll);
 
 router.get("/:id", authorize(PERMISSIONS.HOUSES.READ), validateId, handleValidation, houseController.getById);
 
+router.get(
+  "/:id/batches",
+  authorize(PERMISSIONS.HOUSES.READ),
+  validateId,
+  handleValidation,
+  birdBatchController.listByHouse,
+);
+
 // POST - owner only
 router.post("/", authorize(PERMISSIONS.HOUSES.CREATE), validateCreateHouse, handleValidation, houseController.create);
+
+router.post(
+  "/:id/batches",
+  authorize(PERMISSIONS.HOUSES.UPDATE),
+  validateCreateBirdBatch,
+  handleValidation,
+  birdBatchController.createForHouse,
+);
 
 // PUT - owner only
 router.put("/:id", authorize(PERMISSIONS.HOUSES.UPDATE), validateUpdateHouse, handleValidation, houseController.update);

@@ -1,6 +1,7 @@
 // Entity types - match backend models exactly
 export * from './entities/user';
 export * from './entities/house';
+export * from './entities/birdBatch';
 export * from './entities/dailyLog';
 export * from './entities/feed';
 export * from './entities/sales';

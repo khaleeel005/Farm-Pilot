@@ -5,6 +5,7 @@
 import FeedBatch from "./FeedBatch.js";
 import BatchIngredient from "./BatchIngredient.js";
 import House from "./House.js";
+import BirdBatch from "./BirdBatch.js";
 import DailyLog from "./DailyLog.js";
 import CostEntry from "./CostEntry.js";
 import User from "./User.js";
@@ -53,6 +54,28 @@ House.hasMany(DailyLog, {
 DailyLog.belongsTo(House, {
   foreignKey: "houseId",
   as: "House",
+});
+
+// House <-> BirdBatch (One-to-Many)
+House.hasMany(BirdBatch, {
+  foreignKey: "houseId",
+  as: "birdBatches",
+});
+
+BirdBatch.belongsTo(House, {
+  foreignKey: "houseId",
+  as: "House",
+});
+
+// BirdBatch <-> DailyLog (One-to-Many)
+BirdBatch.hasMany(DailyLog, {
+  foreignKey: "birdBatchId",
+  as: "dailyLogs",
+});
+
+DailyLog.belongsTo(BirdBatch, {
+  foreignKey: "birdBatchId",
+  as: "BirdBatch",
 });
 
 // House <-> CostEntry (One-to-Many)
@@ -152,6 +175,7 @@ export {
   FeedBatch,
   BatchIngredient,
   House,
+  BirdBatch,
   DailyLog,
   CostEntry,
   User,

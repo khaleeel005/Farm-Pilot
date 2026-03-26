@@ -1,4 +1,6 @@
 import type {
+  BirdBatch,
+  BirdBatchPayload,
   DailyLog,
   DailyLogPayload,
   House,
@@ -39,6 +41,25 @@ export async function updateHouse(
   });
   const data = await handleResponse<{ data?: House }>(res);
   return data?.data as House;
+}
+
+export async function getHouseBatches(id: number | string): Promise<BirdBatch[]> {
+  const res = await fetchWithAuth(`${BASE}/api/houses/${id}/batches`);
+  const data = await handleResponse<{ data?: BirdBatch[] }>(res);
+  return data?.data || [];
+}
+
+export async function createHouseBatch(
+  id: number | string,
+  payload: BirdBatchPayload,
+): Promise<BirdBatch> {
+  const res = await fetchWithAuth(`${BASE}/api/houses/${id}/batches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await handleResponse<{ data?: BirdBatch }>(res);
+  return data?.data as BirdBatch;
 }
 
 export async function deleteHouse(id: number | string) {

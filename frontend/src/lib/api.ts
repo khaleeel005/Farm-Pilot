@@ -9,11 +9,13 @@ export { authEvents };
 export { getCurrentUser, login, logout } from "@/lib/authApi";
 export { createStaff, deleteStaff, listStaff, updateStaff } from "@/lib/staffApi";
 export {
+  createHouseBatch,
   createDailyLog,
   createHouse,
   deleteDailyLog,
   deleteHouse,
   getDailyLogs,
+  getHouseBatches,
   getHouses,
   updateDailyLog,
   updateHouse,

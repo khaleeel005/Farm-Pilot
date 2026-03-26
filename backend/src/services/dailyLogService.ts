@@ -1,12 +1,15 @@
 import DailyLog from "../models/DailyLog.js";
 import House from "../models/House.js";
+import BirdBatch from "../models/BirdBatch.js";
 import FeedBatch from "../models/FeedBatch.js";
 import logger from "../config/logger.js";
 import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
 import feedBatchStatsService from "./feedBatchStatsService.js";
+import birdBatchService from "./birdBatchService.js";
 import { sequelize } from "../utils/database.js";
 import type { Transaction } from "sequelize";
 import type {
+  BirdBatchEntity,
   DailyLogEntity,
   FeedBatchEntity,
   HouseEntity,
@@ -15,6 +18,7 @@ import type { DailyLogFiltersInput } from "../types/dto.js";
 
 type DailyLogRecord = DailyLogEntity & {
   House?: HouseEntity;
+  BirdBatch?: BirdBatchEntity | null;
   FeedBatch?: FeedBatchEntity | null;
 };
 
@@ -49,10 +53,20 @@ const HOUSE_ATTRIBUTES: string[] = [
   "status",
 ] ;
 
+const BIRD_BATCH_ATTRIBUTES: string[] = [
+  "id",
+  "houseId",
+  "batchName",
+  "placedAt",
+  "initialBirdCount",
+  "currentBirdCount",
+  "mortalityCount",
+  "status",
+  "notes",
+];
+
 const asDailyLog = (value: unknown): DailyLogRecord | null =>
   value as DailyLogRecord | null;
-
-const asHouse = (value: unknown): HouseEntity | null => value as HouseEntity | null;
 
 const pickDailyLogPayload = (data: DailyLogInput): DailyLogWritePayload => {
   const payload: DailyLogWritePayload = {};
@@ -70,6 +84,20 @@ const pickDailyLogPayload = (data: DailyLogInput): DailyLogWritePayload => {
 
 const getMortalityCount = (value: unknown): number => Number(value ?? 0);
 
+const resolveExistingBirdBatchId = async (
+  log: DailyLogRecord,
+  transaction: Transaction,
+): Promise<number> => {
+  if (log.birdBatchId !== undefined && log.birdBatchId !== null) {
+    return Number(log.birdBatchId);
+  }
+
+  return birdBatchService.resolveCurrentBatchIdForHouse(
+    Number(log.houseId),
+    transaction,
+  );
+};
+
 const getDailyLogWithRelations = (id: string | number, transaction?: Transaction) =>
   DailyLog.findByPk(id, {
     transaction,
@@ -78,6 +106,12 @@ const getDailyLogWithRelations = (id: string | number, transaction?: Transaction
         model: House,
         as: "House",
         attributes: HOUSE_ATTRIBUTES,
+      },
+      {
+        model: BirdBatch,
+        as: "BirdBatch",
+        attributes: BIRD_BATCH_ATTRIBUTES,
+        required: false,
       },
       {
         model: FeedBatch,
@@ -93,45 +127,6 @@ const getDailyLogWithRelations = (id: string | number, transaction?: Transaction
       },
     ],
   });
-
-const applyHouseMortalityDelta = async (
-  houseId: number,
-  mortalityDelta: number,
-  transaction: Transaction,
-) => {
-  if (!mortalityDelta) {
-    return;
-  }
-
-  const house = asHouse(await House.findByPk(houseId, { transaction }));
-  if (!house) {
-    throw new NotFoundError("House not found");
-  }
-
-  const nextCurrentBirdCount = Number(house.currentBirdCount) - mortalityDelta;
-  const nextMortalityCount = Number(house.mortalityCount) + mortalityDelta;
-
-  if (nextCurrentBirdCount < 0) {
-    throw new BadRequestError(
-      `Mortality count exceeds the current bird count for house ${house.houseName}.`,
-    );
-  }
-
-  if (nextMortalityCount < 0) {
-    throw new BadRequestError("House mortality count cannot be negative.");
-  }
-
-  await House.update(
-    {
-      currentBirdCount: nextCurrentBirdCount,
-      mortalityCount: nextMortalityCount,
-    },
-    {
-      where: { id: houseId },
-      transaction,
-    },
-  );
-};
 
 const dailyLogService = {
   // Validate feed batch usage before creating/updating daily log
@@ -215,17 +210,40 @@ const dailyLogService = {
         const nextMortality = getMortalityCount(
           payload.mortalityCount ?? existingLog.mortalityCount,
         );
+        const existingBirdBatchId = await resolveExistingBirdBatchId(
+          existingLog,
+          transaction,
+        );
+        const targetBatchId =
+          payload.houseId && Number(payload.houseId) !== Number(existingLog.houseId)
+            ? await birdBatchService.resolveCurrentBatchIdForHouse(
+                Number(payload.houseId),
+                transaction,
+              )
+            : existingBirdBatchId;
 
-        await applyHouseMortalityDelta(
-          Number(existingLog.houseId),
-          nextMortality - currentMortality,
+        await birdBatchService.applyMortalityDeltaToBatch(
+          existingBirdBatchId,
+          -currentMortality,
           transaction,
         );
 
-        const [updatedCount] = await DailyLog.update(payload, {
+        await birdBatchService.applyMortalityDeltaToBatch(
+          targetBatchId,
+          nextMortality,
+          transaction,
+        );
+
+        const [updatedCount] = await DailyLog.update(
+          {
+            ...payload,
+            birdBatchId: targetBatchId,
+          },
+          {
           where: { id: existingLog.id },
           transaction,
-        });
+          },
+        );
 
         if (!updatedCount) {
           throw new BadRequestError("Failed to update existing daily log");
@@ -238,13 +256,26 @@ const dailyLogService = {
       await dailyLogService.validateFeedBatchUsage(payload);
 
       return sequelize.transaction(async (transaction) => {
-        const created = asDailyLog(await DailyLog.create(payload, { transaction }));
+        const birdBatchId = await birdBatchService.resolveCurrentBatchIdForHouse(
+          Number(payload.houseId),
+          transaction,
+        );
+
+        const created = asDailyLog(
+          await DailyLog.create(
+            {
+              ...payload,
+              birdBatchId,
+            },
+            { transaction },
+          ),
+        );
         if (!created) {
           throw new BadRequestError("Failed to create daily log");
         }
 
-        await applyHouseMortalityDelta(
-          Number(payload.houseId),
+        await birdBatchService.applyMortalityDeltaToBatch(
+          birdBatchId,
           getMortalityCount(payload.mortalityCount),
           transaction,
         );
@@ -278,6 +309,12 @@ const dailyLogService = {
           attributes: HOUSE_ATTRIBUTES,
         },
         {
+          model: BirdBatch,
+          as: "BirdBatch",
+          attributes: BIRD_BATCH_ATTRIBUTES,
+          required: false,
+        },
+        {
           model: FeedBatch,
           as: "FeedBatch",
           attributes: [
@@ -305,6 +342,12 @@ const dailyLogService = {
           model: House,
           as: "House",
           attributes: HOUSE_ATTRIBUTES,
+        },
+        {
+          model: BirdBatch,
+          as: "BirdBatch",
+          attributes: BIRD_BATCH_ATTRIBUTES,
+          required: false,
         },
         {
           model: FeedBatch,
@@ -344,32 +387,45 @@ const dailyLogService = {
       );
       if (!existingLog) throw new NotFoundError("Daily log not found");
 
-      const currentHouseId = Number(existingLog.houseId);
-      const nextHouseId = Number(payload.houseId ?? existingLog.houseId);
+      const existingBirdBatchId = await resolveExistingBirdBatchId(
+        existingLog,
+        transaction,
+      );
       const currentMortality = getMortalityCount(existingLog.mortalityCount);
       const nextMortality = getMortalityCount(
         payload.mortalityCount ?? existingLog.mortalityCount,
       );
+      const nextHouseId = Number(payload.houseId ?? existingLog.houseId);
+      const nextBirdBatchId =
+        nextHouseId === Number(existingLog.houseId)
+          ? existingBirdBatchId
+          : await birdBatchService.resolveCurrentBatchIdForHouse(
+              nextHouseId,
+              transaction,
+            );
 
-      if (currentHouseId === nextHouseId) {
-        await applyHouseMortalityDelta(
-          currentHouseId,
-          nextMortality - currentMortality,
-          transaction,
-        );
-      } else {
-        await applyHouseMortalityDelta(
-          currentHouseId,
-          -currentMortality,
-          transaction,
-        );
-        await applyHouseMortalityDelta(nextHouseId, nextMortality, transaction);
-      }
-
-      const [updatedCount] = await DailyLog.update(payload, {
-        where: { id },
+      await birdBatchService.applyMortalityDeltaToBatch(
+        existingBirdBatchId,
+        -currentMortality,
         transaction,
-      });
+      );
+
+      await birdBatchService.applyMortalityDeltaToBatch(
+        nextBirdBatchId,
+        nextMortality,
+        transaction,
+      );
+
+      const [updatedCount] = await DailyLog.update(
+        {
+          ...payload,
+          birdBatchId: nextBirdBatchId,
+        },
+        {
+          where: { id },
+          transaction,
+        },
+      );
       if (!updatedCount) throw new NotFoundError("Daily log not found");
 
       return getDailyLogWithRelations(id, transaction);
@@ -385,9 +441,13 @@ const dailyLogService = {
         await DailyLog.findByPk(id, { transaction }),
       );
       if (!existingLog) throw new NotFoundError("Daily log not found");
+      const existingBirdBatchId = await resolveExistingBirdBatchId(
+        existingLog,
+        transaction,
+      );
 
-      await applyHouseMortalityDelta(
-        Number(existingLog.houseId),
+      await birdBatchService.applyMortalityDeltaToBatch(
+        existingBirdBatchId,
         -getMortalityCount(existingLog.mortalityCount),
         transaction,
       );

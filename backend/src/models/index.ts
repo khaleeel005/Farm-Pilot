@@ -5,6 +5,7 @@
 // Core models
 export { default as User } from "./User.js";
 export { default as House } from "./House.js";
+export { default as BirdBatch } from "./BirdBatch.js";
 
 // Daily operations
 export { default as DailyLog } from "./DailyLog.js";

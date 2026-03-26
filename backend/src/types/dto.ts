@@ -50,6 +50,13 @@ export interface DailyLogFiltersInput {
   houseId?: number | string;
 }
 
+export interface BirdBatchCreateInput {
+  batchName: string;
+  placedAt: string;
+  initialBirdCount: number | string;
+  notes?: string | null;
+}
+
 export interface FeedBatchIngredientInput {
   ingredientName: string;
   quantityKg: NumericLike;

@@ -15,6 +15,10 @@ const DailyLog = sequelize.define("DailyLog", {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  birdBatchId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   eggsCollected: {
     type: DataTypes.INTEGER,
     allowNull: false,

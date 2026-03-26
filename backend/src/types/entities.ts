@@ -26,10 +26,25 @@ export interface HouseEntity {
   updatedAt?: Date;
 }
 
+export interface BirdBatchEntity {
+  id: number;
+  houseId: number;
+  batchName: string;
+  placedAt: DateString;
+  initialBirdCount: number;
+  currentBirdCount: number;
+  mortalityCount: number;
+  status: "active" | "completed";
+  notes?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface DailyLogEntity {
   id: number;
   logDate: DateString;
   houseId: number;
+  birdBatchId?: number | null;
   eggsCollected: number;
   crackedEggs: number;
   feedBatchId?: number | null;
