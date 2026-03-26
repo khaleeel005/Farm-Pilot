@@ -57,7 +57,7 @@ jobs:
             --exclude '*.ts' \
             --exclude 'node_modules/.cache' \
             --exclude '.env*' \
-            --exclude 'ecosystem.config.js' \
+            --exclude 'ecosystem.config.cjs' \
             -e "ssh -i ~/.ssh/deploy_key" \
             backend/ \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/farmapp/
@@ -68,7 +68,7 @@ jobs:
       - name: Write ecosystem config to server
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "cat > /var/www/farmapp/ecosystem.config.js << 'EOF'
+            "cat > /var/www/farmapp/ecosystem.config.cjs << 'EOF'
           module.exports = {
             apps: [{
               name: 'farm-app',
@@ -107,8 +107,12 @@ jobs:
 
             # Load vars from ecosystem config and run migrations
             node -e "
-              const { apps } = require('./ecosystem.config.js');
+              const config = require('./ecosystem.config.cjs');
               const { execSync } = require('child_process');
+              const apps = config.apps;
+              if (!Array.isArray(apps) || !apps[0] || !apps[0].env) {
+                throw new Error('ecosystem.config.cjs must export { apps: [{ env: ... }] }');
+              }
               Object.assign(process.env, apps[0].env, { USE_MIGRATIONS: 'true' });
               execSync('pnpm exec sequelize-cli db:migrate', { stdio: 'inherit' });
             "
@@ -121,7 +125,7 @@ jobs:
             pm2 delete farm-app 2>/dev/null || true
 
             # Start via ecosystem file — PM2 stores all env vars from it
-            pm2 start ecosystem.config.js
+            pm2 start ecosystem.config.cjs
             pm2 save
 
             # Health check — fail the deploy if app didn't come up
