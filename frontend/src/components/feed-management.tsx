@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Plus, Calculator, Trash2 } from "lucide-react";
+import { Package, Plus, Calculator, Trash2, Copy } from "lucide-react";
 import type { BatchUsageStats, FeedBatch } from "@/types";
 import type {
   FeedBatchDeleteConfirm,
@@ -89,6 +89,7 @@ interface FeedBatchesTableProps {
   isDeleting: boolean;
   onCreateBatch: () => void;
   onDeleteBatch: (batchId: number, batchName: string) => void;
+  onDuplicateBatch: (batch: FeedBatch) => void;
 }
 
 interface DeleteBatchDialogProps {
@@ -146,7 +147,7 @@ function FeedBatchDialog({
           New Feed Batch
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[94vh] w-[98vw] max-w-[110rem] overflow-y-auto p-5 sm:p-7">
+      <DialogContent className="max-h-[94vh] w-[96vw] max-w-[96vw] sm:max-w-[90vw] lg:max-w-5xl overflow-y-auto p-5 sm:p-7">
         <DialogHeader className="rounded-xl border border-border/70 bg-background/55 p-5 sm:p-6">
           <DialogTitle className="text-lg sm:text-xl">
             Create New Feed Batch
@@ -157,7 +158,10 @@ function FeedBatchDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mt-5 space-y-6 sm:space-y-7">
-          <BatchDetailsSection newBatch={newBatch} onUpdateBatch={onUpdateBatch} />
+          <BatchDetailsSection
+            newBatch={newBatch}
+            onUpdateBatch={onUpdateBatch}
+          />
 
           <Separator />
 
@@ -242,19 +246,19 @@ function BatchDetailsSection({
           />
         </div>
         <div className="space-y-3">
-          <Label htmlFor="bagSize">Bag Size (kg)</Label>
+          <Label htmlFor="totalBags">Total Bags</Label>
           <Input
-            id="bagSize"
+            id="totalBags"
             type="number"
-            step="0.01"
-            value={newBatch.bagSizeKg}
+            value={newBatch.totalBags}
             onChange={(event) =>
               onUpdateBatch((current) => ({
                 ...current,
-                bagSizeKg: Number.parseFloat(event.target.value) || 50,
+                totalBags:
+                  event.target.value === "" ? "" : Number(event.target.value),
               }))
             }
-            placeholder="50.00"
+            placeholder="e.g. 50"
           />
         </div>
         <div className="space-y-3 sm:col-span-2 lg:col-span-4">
@@ -267,8 +271,7 @@ function BatchDetailsSection({
             onChange={(event) =>
               onUpdateBatch((current) => ({
                 ...current,
-                miscellaneousCost:
-                  Number.parseFloat(event.target.value) || 0,
+                miscellaneousCost: Number.parseFloat(event.target.value) || 0,
               }))
             }
             placeholder="Labor, transport, milling, packaging, etc."
@@ -309,17 +312,6 @@ function IngredientInputsSection({
           Enter ingredient source, quantity, and cost for each line item.
         </p>
       </div>
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center sm:gap-0">
-        <Button
-          onClick={onAddIngredient}
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Ingredient
-        </Button>
-      </div>
 
       {ingredients.map((ingredient, index) => (
         <IngredientCard
@@ -331,6 +323,18 @@ function IngredientInputsSection({
           onUpdateIngredient={onUpdateIngredient}
         />
       ))}
+
+      <div className="flex flex-col justify-center pt-2 sm:flex-row sm:items-center">
+        <Button
+          onClick={onAddIngredient}
+          variant="outline"
+          size="sm"
+          className="w-full sm:w-auto"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Another Ingredient
+        </Button>
+      </div>
     </div>
   );
 }
@@ -504,9 +508,6 @@ function CostEstimateCard({
             <div className="text-muted-foreground">Total Bags</div>
             <div className="font-medium">
               {Number(costEstimate.totalBags).toFixed(2)} bags
-              <div className="text-xs text-muted-foreground">
-                @ {Number(costEstimate.bagSizeKg).toFixed(2)}kg each
-              </div>
             </div>
           </div>
           <div className="text-center sm:text-left">
@@ -546,6 +547,7 @@ function FeedBatchesTable({
   isDeleting,
   onCreateBatch,
   onDeleteBatch,
+  onDuplicateBatch,
 }: FeedBatchesTableProps) {
   return (
     <Card>
@@ -572,7 +574,9 @@ function FeedBatchesTable({
                 <TableRow>
                   <TableHead className="min-w-[140px]">Batch Name</TableHead>
                   <TableHead className="min-w-[90px]">Date</TableHead>
-                  <TableHead className="min-w-[100px]">Total Quantity</TableHead>
+                  <TableHead className="min-w-[100px]">
+                    Total Quantity
+                  </TableHead>
                   <TableHead className="min-w-[80px]">Total Bags</TableHead>
                   <TableHead className="min-w-[90px]">Used/Remaining</TableHead>
                   <TableHead className="min-w-[100px]">Usage %</TableHead>
@@ -587,12 +591,15 @@ function FeedBatchesTable({
                   <FeedBatchRow
                     key={batch.id}
                     batch={batch}
+                    canCreate={canCreate}
                     canDelete={canDelete}
                     isDeleting={isDeleting}
                     onDeleteBatch={onDeleteBatch}
+                    onDuplicateBatch={onDuplicateBatch}
                     usageStats={
-                      batchUsageStats.find((stat) => stat.batchId === batch.id) ??
-                      null
+                      batchUsageStats.find(
+                        (stat) => stat.batchId === batch.id,
+                      ) ?? null
                     }
                   />
                 ))}
@@ -607,15 +614,19 @@ function FeedBatchesTable({
 
 function FeedBatchRow({
   batch,
+  canCreate,
   canDelete,
   isDeleting,
   onDeleteBatch,
+  onDuplicateBatch,
   usageStats,
 }: {
   batch: FeedBatch;
+  canCreate: boolean;
   canDelete: boolean;
   isDeleting: boolean;
   onDeleteBatch: (batchId: number, batchName: string) => void;
+  onDuplicateBatch: (batch: FeedBatch) => void;
   usageStats: BatchUsageStats | null;
 }) {
   const usagePercentage = usageStats?.usagePercentage ?? 0;
@@ -641,15 +652,13 @@ function FeedBatchRow({
           <div className="font-medium">
             {Number(batch.totalBags).toFixed(2)} bags
           </div>
-          <div className="text-muted-foreground text-xs">
-            @ {Number(batch.bagSizeKg).toFixed(2)}kg each
-          </div>
         </div>
       </TableCell>
       <TableCell>
         <div className="text-sm">
           <div className="font-medium">
-            {usageStats?.bagsUsed ?? 0} / {usageStats?.remainingBags ?? batch.totalBags}
+            {usageStats?.bagsUsed ?? 0} /{" "}
+            {usageStats?.remainingBags ?? batch.totalBags}
           </div>
           <div className="text-muted-foreground text-xs">Used / Remaining</div>
         </div>
@@ -682,7 +691,8 @@ function FeedBatchRow({
         <div className="flex flex-wrap gap-1 max-w-[200px]">
           {batch.ingredients?.map((ingredient, index) => (
             <Badge key={index} variant="secondary" className="text-xs">
-              {ingredient.ingredientName} ({Number(ingredient.quantityKg).toFixed(2)}
+              {ingredient.ingredientName} (
+              {Number(ingredient.quantityKg).toFixed(2)}
               kg)
             </Badge>
           ))}
@@ -695,6 +705,17 @@ function FeedBatchRow({
               Low Stock
             </Badge>
           )}
+          {canCreate && (
+            <Button
+              onClick={() => onDuplicateBatch(batch)}
+              variant="outline"
+              size="sm"
+              className="text-blue-600 hover:text-blue-700 hover:border-blue-300"
+              title="Duplicate Batch"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          )}
           {canDelete && (
             <Button
               onClick={() => onDeleteBatch(batch.id, batch.batchName)}
@@ -702,6 +723,7 @@ function FeedBatchRow({
               size="sm"
               className="text-red-600 hover:text-red-700 hover:border-red-300"
               disabled={isDeleting}
+              title="Delete Batch"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -719,14 +741,17 @@ function DeleteBatchDialog({
   onConfirm,
 }: DeleteBatchDialogProps) {
   return (
-    <Dialog open={deleteConfirm.show} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={deleteConfirm.show}
+      onOpenChange={(open) => !open && onClose()}
+    >
       <DialogContent className="sm:max-w-[470px]">
         <DialogHeader>
           <DialogTitle>Confirm Deletion</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete the batch "
-            {deleteConfirm.batchName}"? This action cannot be undone and will
-            permanently remove all associated ingredients.
+            Are you sure you want to delete the batch "{deleteConfirm.batchName}
+            "? This action cannot be undone and will permanently remove all
+            associated ingredients.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
@@ -776,7 +801,10 @@ function ValidationErrorsDialog({
         </DialogHeader>
         <div className="space-y-2">
           {errors.map((error, index) => (
-            <div key={index} className="flex items-center gap-2 text-red-600 text-sm">
+            <div
+              key={index}
+              className="flex items-center gap-2 text-red-600 text-sm"
+            >
               <div className="h-1.5 w-1.5 bg-red-600 rounded-full" />
               {error}
             </div>
@@ -794,7 +822,9 @@ function ValidationErrorsDialog({
 
 export function FeedManagement() {
   const [showNewBatch, setShowNewBatch] = useState(false);
-  const [costEstimate, setCostEstimate] = useState<FeedCostEstimate | null>(null);
+  const [costEstimate, setCostEstimate] = useState<FeedCostEstimate | null>(
+    null,
+  );
   const [deleteConfirm, setDeleteConfirm] =
     useState<FeedBatchDeleteConfirm>(EMPTY_DELETE_CONFIRM);
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -835,6 +865,22 @@ export function FeedManagement() {
     closeBatchDialog();
   };
 
+  const handleDuplicateBatch = (batch: FeedBatch) => {
+    setNewBatch({
+      batchName: `${batch.batchName} (Copy)`,
+      batchDate: new Date().toISOString().split("T")[0],
+      totalBags: batch.totalBags || "",
+      miscellaneousCost: batch.miscellaneousCost || 0,
+      ingredients: batch.ingredients?.map((ing) => ({
+        ingredientName: ing.ingredientName,
+        quantityKg: ing.quantityKg,
+        totalCost: ing.totalCost,
+        supplier: ing.supplier || "",
+      })) || [createEmptyIngredientInput()],
+    });
+    setShowNewBatch(true);
+  };
+
   const handleAddIngredient = () => {
     setNewBatch((current) => ({
       ...current,
@@ -847,7 +893,9 @@ export function FeedManagement() {
       ...current,
       ingredients:
         current.ingredients.length > 1
-          ? current.ingredients.filter((_, ingredientIndex) => ingredientIndex !== index)
+          ? current.ingredients.filter(
+              (_, ingredientIndex) => ingredientIndex !== index,
+            )
           : current.ingredients,
     }));
   };
@@ -883,7 +931,7 @@ export function FeedManagement() {
     try {
       const response = await estimateBatchCost({
         ingredients: buildFeedIngredients(validIngredients),
-        bagSizeKg: newBatch.bagSizeKg,
+        totalBags: Number(newBatch.totalBags) || undefined,
         miscellaneousCost: newBatch.miscellaneousCost,
       });
       setCostEstimate(extractFeedCostEstimate(response));
@@ -956,7 +1004,9 @@ export function FeedManagement() {
   };
 
   if (loading) {
-    return <LoadingSpinner fullPage message="Loading feed management data..." />;
+    return (
+      <LoadingSpinner fullPage message="Loading feed management data..." />
+    );
   }
 
   if (error) {
@@ -1006,6 +1056,70 @@ export function FeedManagement() {
         }
       />
 
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-2">
+        <Card className="border-border/60 bg-gradient-to-br from-background/80 to-background/40 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Total Feed Produced
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight">
+              {batches
+                .reduce((sum, b) => sum + Number(b.totalBags), 0)
+                .toLocaleString()}{" "}
+              <span className="text-lg font-normal text-muted-foreground">
+                bags
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Across {batches.length} batches
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 bg-gradient-to-br from-background/80 to-background/40 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Avg Cost per Bag
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight">
+              {formatFeedCurrency(
+                batches.length > 0
+                  ? batches.reduce((sum, b) => sum + Number(b.costPerBag), 0) /
+                      batches.length
+                  : 0,
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Based on historical data
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 bg-gradient-to-br from-red-500/10 to-background/40 shadow-sm backdrop-blur-md transition-all hover:shadow-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-red-500/80 uppercase tracking-wider">
+              Low Stock Warnings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight text-red-600/90">
+              {batchUsageStats?.filter((s) => s.isNearlyEmpty).length || 0}{" "}
+              <span className="text-lg font-normal text-red-500/70">
+                batches
+              </span>
+            </div>
+            <p className="text-xs text-red-500/70 mt-1">
+              Require immediate attention
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <FeedBatchesTable
         batchUsageStats={batchUsageStats}
         batches={batches}
@@ -1014,6 +1128,7 @@ export function FeedManagement() {
         isDeleting={isDeleting}
         onCreateBatch={() => setShowNewBatch(true)}
         onDeleteBatch={requestDeleteBatch}
+        onDuplicateBatch={handleDuplicateBatch}
       />
 
       <DeleteBatchDialog

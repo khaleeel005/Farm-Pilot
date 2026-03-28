@@ -22,7 +22,7 @@ export interface UseFeedManagementReturn {
   deleteBatch: (id: number | string) => Promise<void>;
   estimateBatchCost: (payload: {
     ingredients: Ingredient[];
-    bagSizeKg?: number;
+    totalBags?: number;
     miscellaneousCost?: number;
   }) => Promise<Record<string, unknown>>;
   isCreating: boolean;
@@ -61,7 +61,7 @@ export function useFeedManagement(): UseFeedManagementReturn {
   const estimateBatchCostMutation = useMutation({
     mutationFn: (payload: {
       ingredients: Ingredient[];
-      bagSizeKg?: number;
+      totalBags?: number;
       miscellaneousCost?: number;
     }) => calculateFeedBatchCost(payload),
   });

@@ -86,8 +86,15 @@ const laborService = {
     const [rawYear, rawMonth] = monthKey.split("-");
     const year = Number(rawYear ?? 0);
     const month = Number(rawMonth ?? 0);
-    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-      throw new BadRequestError("monthYear must be in YYYY-MM or YYYY-MM-DD format");
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(month) ||
+      month < 1 ||
+      month > 12
+    ) {
+      throw new BadRequestError(
+        "monthYear must be in YYYY-MM or YYYY-MM-DD format",
+      );
     }
 
     // helper: count working days in the month (exclude Sundays)
@@ -112,15 +119,17 @@ const laborService = {
       // get assignments for the laborer in the month
       const start = `${monthKey}-01`;
       const end = `${monthKey}-${new Date(year, month, 0).getDate()}`;
-      const assignments = asEntities<WorkAssignmentEntity>(await WorkAssignment.findAll({
-        where: { laborerId: l.id, date: { [Op.between]: [start, end] } },
-      }));
+      const assignments = asEntities<WorkAssignmentEntity>(
+        await WorkAssignment.findAll({
+          where: { laborerId: l.id, date: { [Op.between]: [start, end] } },
+        }),
+      );
 
       const daysPresent = assignments.filter(
-        (a) => a.attendanceStatus === "present"
+        (a) => a.attendanceStatus === "present",
       ).length;
       const halfDays = assignments.filter(
-        (a) => a.attendanceStatus === "half_day"
+        (a) => a.attendanceStatus === "half_day",
       ).length;
       const daysWorked = daysPresent + 0.5 * halfDays;
       const daysAbsent = Math.max(0, workingDaysInMonth - daysWorked);
@@ -136,7 +145,7 @@ const laborService = {
 
       const earnedSalary = baseSalary - salaryDeductions + bonusAmount;
 
-      const p = ((await Payroll.create({
+      const p = (await Payroll.create({
         monthYear: monthKey,
         laborerId: l.id,
         baseSalary: baseSalary,
@@ -146,7 +155,7 @@ const laborService = {
         bonusAmount: bonusAmount,
         finalSalary: earnedSalary,
         paymentStatus: "pending",
-      })) as unknown) as PayrollEntity;
+      })) as unknown as PayrollEntity;
       created.push(p);
     }
 
@@ -167,7 +176,10 @@ const laborService = {
 
   getPayrollForMonth: async (monthYear: string | undefined) => {
     if (!monthYear) throw new BadRequestError("monthYear is required");
-    return Payroll.findAll({ where: { monthYear } });
+    return Payroll.findAll({
+      where: { monthYear },
+      include: [{ model: Laborer, as: "laborer" }],
+    });
   },
 
   getPayrollSummary: async (year: string | undefined) => {

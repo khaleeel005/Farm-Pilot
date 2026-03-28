@@ -9,8 +9,10 @@ import {
   deleteLaborer,
   getLaborers,
   getPayrollMonth,
+  generatePayroll,
+  updatePayroll,
 } from "@/lib/api";
-import type { Laborer, LaborerPayload, Payroll } from "@/types";
+import type { Laborer, LaborerPayload, Payroll, PayrollPayload } from "@/types";
 
 export interface UseLaborersReturn {
   laborers: Laborer[];
@@ -29,6 +31,10 @@ export interface UsePayrollMonthReturn {
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
+  generate: () => Promise<Payroll[]>;
+  update: (id: string | number, payload: PayrollPayload) => Promise<Payroll>;
+  isGenerating: boolean;
+  isUpdating: boolean;
 }
 
 export const LABORERS_QUERY_KEY = ["laborers"] as const;
@@ -91,6 +97,30 @@ export function usePayrollMonth(monthYear: string): UsePayrollMonthReturn {
   const queryClient = useQueryClient();
   const payrollQuery = useQuery(payrollMonthQueryOptions(monthYear));
 
+  const generateMutation = useMutation({
+    mutationFn: () => generatePayroll(monthYear),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [...PAYROLL_QUERY_KEY, monthYear],
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string | number;
+      payload: PayrollPayload;
+    }) => updatePayroll(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: [...PAYROLL_QUERY_KEY, monthYear],
+      });
+    },
+  });
+
   return {
     payroll: payrollQuery.data ?? [],
     loading: payrollQuery.isPending,
@@ -101,6 +131,10 @@ export function usePayrollMonth(monthYear: string): UsePayrollMonthReturn {
       });
       await payrollQuery.refetch();
     },
+    generate: () => generateMutation.mutateAsync(),
+    update: (id, payload) => updateMutation.mutateAsync({ id, payload }),
+    isGenerating: generateMutation.isPending,
+    isUpdating: updateMutation.isPending,
   };
 }
 

@@ -112,11 +112,12 @@ const feedController = {
     next: NextFunction,
   ) => {
     try {
-      const { ingredients, bagSizeKg, miscellaneousCost } = req.body;
+      const { ingredients, bagSizeKg, miscellaneousCost, totalBags } = req.body;
       const result = await feedBatchService.calculateBatchCost(
         ingredients,
         bagSizeKg || 50,
         miscellaneousCost || 0,
+        totalBags,
       );
       res.json({ success: true, data: result });
     } catch (err) {
@@ -139,7 +140,11 @@ const feedController = {
   },
 
   // Get individual batch usage stats
-  getBatchUsageById: async (req: Request, res: Response, next: NextFunction) => {
+  getBatchUsageById: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const stats = await feedBatchStatsService.getBatchUsageStats(
         req.params.id,

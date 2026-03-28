@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -45,10 +45,15 @@ import { ErrorState } from "@/components/shared/error-state";
 import { PageHeader } from "@/components/shared/page-header";
 
 export function LaborManagement() {
-  const monthYear = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const [monthYear, setMonthYear] = useState(() =>
+    new Date().toISOString().slice(0, 7),
+  );
   const [showNewWorker, setShowNewWorker] = useState(false);
   const [deleteConfirmWorker, setDeleteConfirmWorker] =
     useState<Laborer | null>(null);
+  const [editPayroll, setEditPayroll] = useState<any | null>(null);
+  const [bonusInput, setBonusInput] = useState("0");
+  const [deductionInput, setDeductionInput] = useState("0");
   const {
     laborers: workers,
     loading: workersLoading,
@@ -63,7 +68,58 @@ export function LaborManagement() {
     loading: payrollLoading,
     error: payrollError,
     refresh: refreshPayroll,
+    generate: generatePayroll,
+    update: updatePayroll,
+    isGenerating: isPayrollGenerating,
+    isUpdating: isPayrollUpdating,
   } = usePayrollMonth(monthYear);
+
+  const handleGeneratePayroll = async () => {
+    try {
+      await generatePayroll();
+      toast.success("Payroll generated for " + monthYear);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate payroll");
+    }
+  };
+
+  const handleTogglePaymentStatus = async (
+    payrollId: number | string | undefined,
+    currentStatus: string,
+  ) => {
+    if (!payrollId) return;
+    try {
+      const newStatus = currentStatus === "paid" ? "pending" : "paid";
+      await updatePayroll(payrollId, { paymentStatus: newStatus } as any);
+      toast.success("Payment status updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update payment status");
+    }
+  };
+
+  const handleSavePayrollEdit = async () => {
+    if (!editPayroll || !editPayroll.id) return;
+    try {
+      const b = Number(bonusInput) || 0;
+      const d = Number(deductionInput) || 0;
+      const base = Number(editPayroll.baseSalary || 0);
+      const fs = base - d + b;
+
+      await updatePayroll(editPayroll.id, {
+        bonusAmount: b,
+        salaryDeductions: d,
+        finalSalary: fs,
+      } as any);
+
+      toast.success("Payroll record updated");
+      setEditPayroll(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update payroll");
+    }
+  };
 
   // Permission checks
   const { canCreate, canDelete } = useResourcePermissions("LABORERS");
@@ -251,6 +307,50 @@ export function LaborManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Payroll Dialog */}
+      <Dialog
+        open={!!editPayroll}
+        onOpenChange={(open) => !open && setEditPayroll(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Payroll Record</DialogTitle>
+            <DialogDescription>
+              Update bonus and deductions for {editPayroll?.laborer?.fullName}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Bonus (₦)</Label>
+              <Input
+                type="number"
+                value={bonusInput}
+                onChange={(e) => setBonusInput(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Deductions (₦)</Label>
+              <Input
+                type="number"
+                value={deductionInput}
+                onChange={(e) => setDeductionInput(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPayroll(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePayrollEdit}
+              disabled={isPayrollUpdating}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Labor Overview */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
@@ -389,13 +489,21 @@ export function LaborManagement() {
         {/* Payroll Tab */}
         <TabsContent value="payroll" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="display-heading text-2xl">
-                Monthly Payroll - January 2025
-              </CardTitle>
-              <CardDescription>
-                Salary calculations and payment status
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="display-heading text-2xl">
+                  Monthly Payroll
+                </CardTitle>
+                <CardDescription>
+                  Salary calculations and payment status
+                </CardDescription>
+              </div>
+              <Input
+                type="month"
+                value={monthYear}
+                onChange={(e) => setMonthYear(e.target.value)}
+                className="w-40"
+              />
             </CardHeader>
             <CardContent>
               <Table>
@@ -408,6 +516,7 @@ export function LaborManagement() {
                     <TableHead>Bonus</TableHead>
                     <TableHead>Final Pay</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -442,9 +551,45 @@ export function LaborManagement() {
                               ? "default"
                               : "destructive"
                           }
+                          className="capitalize"
                         >
-                          {payrollItem.paymentStatus || ""}
+                          {payrollItem.paymentStatus || "pending"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isPayrollUpdating}
+                            onClick={() => {
+                              setEditPayroll(payrollItem);
+                              setBonusInput(
+                                payrollItem.bonusAmount?.toString() || "0",
+                              );
+                              setDeductionInput(
+                                payrollItem.salaryDeductions?.toString() || "0",
+                              );
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isPayrollUpdating}
+                            onClick={() =>
+                              handleTogglePaymentStatus(
+                                payrollItem.id,
+                                payrollItem.paymentStatus || "pending",
+                              )
+                            }
+                          >
+                            {payrollItem.paymentStatus === "paid"
+                              ? "Unpay"
+                              : "Pay"}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -469,8 +614,12 @@ export function LaborManagement() {
                   <Button variant="outline" className="flex-1 sm:flex-none">
                     Export Report
                   </Button>
-                  <Button className="flex-1 sm:flex-none">
-                    Process Payments
+                  <Button
+                    className="flex-1 sm:flex-none"
+                    onClick={handleGeneratePayroll}
+                    disabled={isPayrollGenerating}
+                  >
+                    Generate / Update Payroll
                   </Button>
                 </div>
               </div>

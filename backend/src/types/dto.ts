@@ -62,6 +62,7 @@ export interface FeedBatchCreateInput {
   batchName: string;
   ingredients: FeedBatchIngredientInput[];
   bagSizeKg?: NumericLike;
+  totalBags?: NumericLike;
   miscellaneousCost?: NumericLike;
 }
 

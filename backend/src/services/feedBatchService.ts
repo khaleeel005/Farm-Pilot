@@ -1,4 +1,8 @@
-import { FeedBatch, BatchIngredient, DailyLog } from "../models/associations.js";
+import {
+  FeedBatch,
+  BatchIngredient,
+  DailyLog,
+} from "../models/associations.js";
 import {
   NotFoundError,
   BadRequestError,
@@ -85,8 +89,13 @@ const feedBatchService = {
     const totalQuantityTons = totalQuantityKg / 1000;
 
     const bagSizeKg = Number(data.bagSizeKg) || 50;
+    const userBags = Number(data.totalBags);
     const totalBags =
-      totalQuantityKg > 0 ? Math.ceil(totalQuantityKg / bagSizeKg) : 0;
+      userBags > 0
+        ? userBags
+        : totalQuantityKg > 0
+          ? Math.ceil(totalQuantityKg / bagSizeKg)
+          : 0;
     const costPerBag = totalBags > 0 ? totalCost / totalBags : 0;
     const costPerKg = totalQuantityKg > 0 ? totalCost / totalQuantityKg : 0;
 
@@ -198,8 +207,13 @@ const feedBatchService = {
         const totalQuantityTons = totalQuantityKg / 1000;
 
         const bagSizeKg = Number(updates.bagSizeKg ?? batch.bagSizeKg);
+        const userBags = Number(updates.totalBags);
         const totalBags =
-          totalQuantityKg > 0 ? Math.ceil(totalQuantityKg / bagSizeKg) : 0;
+          userBags > 0
+            ? userBags
+            : totalQuantityKg > 0
+              ? Math.ceil(totalQuantityKg / bagSizeKg)
+              : 0;
         const costPerBag = totalBags > 0 ? totalCost / totalBags : 0;
         const costPerKg = totalQuantityKg > 0 ? totalCost / totalQuantityKg : 0;
 
@@ -218,11 +232,14 @@ const feedBatchService = {
             ingredientName: ingredient.ingredientName,
             quantityKg: ingredient.quantityKg,
             totalCost: ingredient.totalCost,
-            costPerKg: Number(ingredient.totalCost) / Number(ingredient.quantityKg),
+            costPerKg:
+              Number(ingredient.totalCost) / Number(ingredient.quantityKg),
             supplier: ingredient.supplier || null,
           }),
         );
-        await BatchIngredient.bulkCreate(ingredientsWithBatchId, { transaction });
+        await BatchIngredient.bulkCreate(ingredientsWithBatchId, {
+          transaction,
+        });
 
         delete updates.ingredients;
       }
@@ -298,7 +315,10 @@ const feedBatchService = {
       );
 
       // Recalculate batch totals
-      await feedBatchService.recalculateBatchTotals(resolvedBatchId, transaction);
+      await feedBatchService.recalculateBatchTotals(
+        resolvedBatchId,
+        transaction,
+      );
 
       return ingredient;
     });
@@ -317,13 +337,17 @@ const feedBatchService = {
       if (!ingredient) throw new NotFoundError("Ingredient not found");
 
       if (updates.quantityKg && updates.totalCost) {
-        updates.costPerKg = Number(updates.totalCost) / Number(updates.quantityKg);
+        updates.costPerKg =
+          Number(updates.totalCost) / Number(updates.quantityKg);
       }
 
       await ingredient.update(updates, { transaction });
 
       // Recalculate batch totals
-      await feedBatchService.recalculateBatchTotals(ingredient.batchId, transaction);
+      await feedBatchService.recalculateBatchTotals(
+        ingredient.batchId,
+        transaction,
+      );
 
       return ingredient;
     });
@@ -355,16 +379,18 @@ const feedBatchService = {
     const resolvedBatchId = ensureId(batchId, "Feed batch id");
     return withTransaction(async (activeTransaction) => {
       const batch = asEntity<FeedBatchEntity>(
-        await FeedBatch.findByPk(resolvedBatchId, { transaction: activeTransaction }),
+        await FeedBatch.findByPk(resolvedBatchId, {
+          transaction: activeTransaction,
+        }),
       );
       if (!batch) {
         throw new NotFoundError("Feed batch not found");
       }
 
-      const ingredients = ((await BatchIngredient.findAll({
+      const ingredients = (await BatchIngredient.findAll({
         where: { batchId: resolvedBatchId },
         transaction: activeTransaction,
-      })) as unknown) as BatchIngredientEntity[];
+      })) as unknown as BatchIngredientEntity[];
 
       const ingredientsCost = ingredients.reduce(
         (sum, ing) => sum + Number(ing.totalCost),
@@ -379,7 +405,10 @@ const feedBatchService = {
       const totalQuantityTons = totalQuantityKg / 1000;
       const bagSizeKg = Number(batch.bagSizeKg) || 50;
 
-      const totalBags = Math.ceil(totalQuantityKg / bagSizeKg);
+      const totalBags =
+        Number(batch.totalBags) > 0
+          ? Number(batch.totalBags)
+          : Math.ceil(totalQuantityKg / bagSizeKg);
       const costPerBag = totalBags > 0 ? totalCost / totalBags : 0;
       const costPerKg = totalQuantityKg > 0 ? totalCost / totalQuantityKg : 0;
 
@@ -402,6 +431,7 @@ const feedBatchService = {
     ingredients: FeedBatchIngredientInput[],
     bagSizeKg = 50,
     miscellaneousCost = 0,
+    totalBagsProvided?: number,
   ) => {
     if (!Array.isArray(ingredients) || ingredients.length === 0) {
       throw new BadRequestError("Ingredients array is required");
@@ -419,7 +449,10 @@ const feedBatchService = {
     );
     const totalQuantityTons = totalQuantityKg / 1000;
 
-    const totalBags = Math.ceil(totalQuantityKg / bagSizeKg);
+    const totalBags =
+      Number(totalBagsProvided) > 0
+        ? Number(totalBagsProvided)
+        : Math.ceil(totalQuantityKg / bagSizeKg);
     const costPerBag = totalBags > 0 ? totalCost / totalBags : 0;
     const costPerKg = totalQuantityKg > 0 ? totalCost / totalQuantityKg : 0;
 

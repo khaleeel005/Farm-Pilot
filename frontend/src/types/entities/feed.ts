@@ -54,6 +54,7 @@ export interface FeedBatchPayload {
   batchDate: string;
   batchName: string;
   bagSizeKg?: number;
+  totalBags?: number;
   miscellaneousCost?: number;
   ingredients: Ingredient[];
 }

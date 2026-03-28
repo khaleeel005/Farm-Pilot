@@ -10,7 +10,7 @@ export interface IngredientInput {
 export interface FeedBatchFormData {
   batchName: string;
   batchDate: string;
-  bagSizeKg: number;
+  totalBags: number | "";
   miscellaneousCost: number;
   ingredients: IngredientInput[];
 }
@@ -46,7 +46,7 @@ export function createEmptyFeedBatchForm(): FeedBatchFormData {
   return {
     batchName: "",
     batchDate: new Date().toISOString().split("T")[0],
-    bagSizeKg: 50,
+    totalBags: "",
     miscellaneousCost: 0,
     ingredients: [createEmptyIngredientInput()],
   };
@@ -55,7 +55,9 @@ export function createEmptyFeedBatchForm(): FeedBatchFormData {
 export function getValidIngredients(ingredients: IngredientInput[]) {
   return ingredients.filter(
     (ingredient) =>
-      ingredient.ingredientName && ingredient.quantityKg > 0 && ingredient.totalCost > 0,
+      ingredient.ingredientName &&
+      ingredient.quantityKg > 0 &&
+      ingredient.totalCost > 0,
   );
 }
 
@@ -77,7 +79,7 @@ export function buildFeedBatchPayload(
   return {
     batchDate: formData.batchDate,
     batchName: formData.batchName,
-    bagSizeKg: formData.bagSizeKg,
+    totalBags: Number(formData.totalBags) || undefined,
     miscellaneousCost: formData.miscellaneousCost,
     ingredients: buildFeedIngredients(formData.ingredients),
   };
