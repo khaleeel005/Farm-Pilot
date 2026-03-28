@@ -28,11 +28,11 @@ export const PERMISSIONS = {
     DELETE: [ROLES.OWNER],
   },
 
-  // Sales - owner only for write operations
+  // Sales - staff can create/update, only owner can delete
   SALES: {
-    CREATE: [ROLES.OWNER],
+    CREATE: [ROLES.OWNER, ROLES.STAFF],
     READ: [ROLES.OWNER, ROLES.STAFF],
-    UPDATE: [ROLES.OWNER],
+    UPDATE: [ROLES.OWNER, ROLES.STAFF],
     DELETE: [ROLES.OWNER],
   },
 
