@@ -2,9 +2,8 @@ import type { FeedBatchPayload, Ingredient } from "@/types";
 
 export interface IngredientInput {
   ingredientName: string;
-  quantityKg: number;
-  totalCost: number;
-  supplier: string;
+  quantityKg: string | number;
+  totalCost: string | number;
 }
 
 export interface FeedBatchFormData {
@@ -36,9 +35,8 @@ export interface FeedBatchDeleteConfirm {
 export function createEmptyIngredientInput(): IngredientInput {
   return {
     ingredientName: "",
-    quantityKg: 0,
-    totalCost: 0,
-    supplier: "",
+    quantityKg: "",
+    totalCost: "",
   };
 }
 
@@ -56,8 +54,8 @@ export function getValidIngredients(ingredients: IngredientInput[]) {
   return ingredients.filter(
     (ingredient) =>
       ingredient.ingredientName &&
-      ingredient.quantityKg > 0 &&
-      ingredient.totalCost > 0,
+      Number(ingredient.quantityKg) > 0 &&
+      Number(ingredient.totalCost) > 0,
   );
 }
 
@@ -65,10 +63,12 @@ export function buildFeedIngredients(
   ingredients: IngredientInput[],
 ): Ingredient[] {
   return getValidIngredients(ingredients).map((ingredient) => ({
-    ...ingredient,
+    ingredientName: ingredient.ingredientName,
+    quantityKg: Number(ingredient.quantityKg),
+    totalCost: Number(ingredient.totalCost),
     costPerKg:
-      ingredient.quantityKg > 0
-        ? ingredient.totalCost / ingredient.quantityKg
+      Number(ingredient.quantityKg) > 0
+        ? Number(ingredient.totalCost) / Number(ingredient.quantityKg)
         : 0,
   }));
 }

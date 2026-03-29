@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   calculateFeedBatchCost,
   createFeedBatch,
+  updateFeedBatch,
   deleteFeedBatch,
 } from "@/lib/api";
 import { useFeedInventory } from "@/hooks/useFeedInventory";
@@ -19,6 +20,7 @@ export interface UseFeedManagementReturn {
   error: Error | null;
   refresh: () => Promise<void>;
   createBatch: (payload: FeedBatchPayload) => Promise<void>;
+  updateBatch: (id: number | string, payload: Partial<FeedBatchPayload>) => Promise<void>;
   deleteBatch: (id: number | string) => Promise<void>;
   estimateBatchCost: (payload: {
     ingredients: Ingredient[];
@@ -51,6 +53,14 @@ export function useFeedManagement(): UseFeedManagementReturn {
     },
   });
 
+  const updateBatchMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number | string; payload: Partial<FeedBatchPayload> }) =>
+      updateFeedBatch(id, payload),
+    onSuccess: async () => {
+      await invalidateFeedInventory();
+    },
+  });
+
   const deleteBatchMutation = useMutation({
     mutationFn: (id: number | string) => deleteFeedBatch(id),
     onSuccess: async () => {
@@ -78,6 +88,9 @@ export function useFeedManagement(): UseFeedManagementReturn {
     error: error instanceof Error ? error : null,
     createBatch: async (payload) => {
       await createBatchMutation.mutateAsync(payload);
+    },
+    updateBatch: async (id, payload) => {
+      await updateBatchMutation.mutateAsync({ id, payload });
     },
     deleteBatch: async (id) => {
       await deleteBatchMutation.mutateAsync(id);

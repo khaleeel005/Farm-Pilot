@@ -57,7 +57,7 @@ export function createEmptyCustomerForm(): CustomerFormData {
 }
 
 export function calculateSaleFormTotal(formData: SaleFormData) {
-  const quantity = Number.parseFloat(formData.quantity) || 0;
+  const quantity = Math.max(0, Number.parseInt(formData.quantity, 10)) || 0;
   const pricePerCrate = Number.parseFloat(formData.pricePerCrate) || 0;
   return quantity * pricePerCrate;
 }
@@ -66,7 +66,7 @@ export function buildSalePayload(formData: SaleFormData): SalePayload {
   return {
     customerId: formData.customerId ? Number.parseInt(formData.customerId, 10) : undefined,
     saleDate: formData.saleDate,
-    quantity: Number.parseFloat(formData.quantity) || 0,
+    quantity: Math.max(0, Number.parseInt(formData.quantity, 10)) || 0,
     pricePerCrate: Number.parseFloat(formData.pricePerCrate) || 0,
     totalAmount: calculateSaleFormTotal(formData),
     paymentStatus: formData.paymentStatus,

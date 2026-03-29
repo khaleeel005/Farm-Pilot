@@ -6,6 +6,7 @@ import FeedBatch from "./FeedBatch.js";
 import BatchIngredient from "./BatchIngredient.js";
 import House from "./House.js";
 import DailyLog from "./DailyLog.js";
+import EggAdjustment from "./EggAdjustment.js";
 import CostEntry from "./CostEntry.js";
 import User from "./User.js";
 import Customer from "./Customer.js";
@@ -103,6 +104,17 @@ Sales.belongsTo(User, {
   as: "supervisor",
 });
 
+// User <-> EggAdjustment (One-to-Many) - Creator relationship
+User.hasMany(EggAdjustment, {
+  foreignKey: "userId",
+  as: "eggAdjustments",
+});
+
+EggAdjustment.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
 // ============================================
 // Customer & Sales Associations
 // ============================================
@@ -160,4 +172,5 @@ export {
   Laborer,
   WorkAssignment,
   Payroll,
+  EggAdjustment,
 };

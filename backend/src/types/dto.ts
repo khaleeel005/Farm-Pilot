@@ -54,7 +54,6 @@ export interface FeedBatchIngredientInput {
   ingredientName: string;
   quantityKg: NumericLike;
   totalCost: NumericLike;
-  supplier?: string | null;
 }
 
 export interface FeedBatchCreateInput {

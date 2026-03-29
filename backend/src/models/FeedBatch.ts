@@ -47,6 +47,12 @@ const FeedBatch = sequelize.define("FeedBatch", {
     comment:
       "Additional expenses like labor, transport, milling, packaging, etc.",
   },
+  manualDeductions: {
+    type: DataTypes.DECIMAL(6, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Manual stock corrections (e.g., lost/spilled bags)",
+  },
 });
 
 export default FeedBatch;

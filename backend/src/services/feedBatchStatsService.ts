@@ -37,7 +37,8 @@ const feedBatchStatsService = {
 
     const totalBagsUsed = Number(usageResult ?? 0);
     const batchTotalBags = Number(batch.totalBags ?? 0);
-    const remainingBags = Math.max(0, batchTotalBags - totalBagsUsed);
+    const manualDeductions = Number(batch.manualDeductions ?? 0);
+    const remainingBags = Math.max(0, batchTotalBags - totalBagsUsed - manualDeductions);
     const usagePercentage =
       batchTotalBags > 0 ? (totalBagsUsed / batchTotalBags) * 100 : 0;
 
@@ -56,7 +57,7 @@ const feedBatchStatsService = {
   getAllBatchUsageStats: async (): Promise<BatchUsageSummary[]> => {
     // Get all batches
     const batches = ((await FeedBatch.findAll({
-      attributes: ["id", "batchName", "totalBags", "costPerBag", "bagSizeKg"],
+      attributes: ["id", "batchName", "totalBags", "costPerBag", "bagSizeKg", "manualDeductions"],
       raw: true,
     })) as unknown) as Array<{
       id: number;
@@ -64,6 +65,7 @@ const feedBatchStatsService = {
       totalBags: number;
       costPerBag: number | string;
       bagSizeKg: number | string;
+      manualDeductions: number | string;
     }>;
 
     // Get usage for each batch - use snake_case for column names since underscored: true
@@ -89,7 +91,8 @@ const feedBatchStatsService = {
     return batches.map((batch) => {
       const totalBagsUsed = usageMap[batch.id] || 0;
       const batchTotalBags = Number(batch.totalBags || 0);
-      const remainingBags = Math.max(0, batchTotalBags - totalBagsUsed);
+      const manualDeductions = Number(batch.manualDeductions || 0);
+      const remainingBags = Math.max(0, batchTotalBags - totalBagsUsed - manualDeductions);
       const usagePercentage =
         batchTotalBags > 0 ? (totalBagsUsed / batchTotalBags) * 100 : 0;
 

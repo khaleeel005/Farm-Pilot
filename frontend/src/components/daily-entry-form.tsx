@@ -48,8 +48,10 @@ import {
   type DailyLogFilters,
 } from "@/lib/dailyLogs";
 import {
+  EGGS_PER_CRATE,
   EMPTY_DAILY_LOG_FORM,
   buildDailyLogPayload,
+  cratesPiecesToEggs,
   getDailyEntrySubmitLabel,
   getFeedBatchMetaTextClassName,
   getFeedBatchNameClassName,
@@ -85,6 +87,7 @@ interface ProductionEntryCardProps {
   selectedHouse: string;
   submitLabel: string;
   batchUsageStats: BatchUsageStats[];
+  eggsPerCrate: number;
 }
 
 interface SidePanelProps {
@@ -136,35 +139,67 @@ function HouseSelectionSection({
 }
 
 function EggCollectionSection({
-  eggsCollected,
-  onEggsCollectedChange,
+  eggCrates,
+  eggPieces,
+  eggsPerCrate,
+  onEggCratesChange,
+  onEggPiecesChange,
 }: {
-  eggsCollected: string;
-  onEggsCollectedChange: (value: string) => void;
+  eggCrates: string;
+  eggPieces: string;
+  eggsPerCrate: number;
+  onEggCratesChange: (value: string) => void;
+  onEggPiecesChange: (value: string) => void;
 }) {
+  const crates = Number.parseInt(eggCrates, 10) || 0;
+  const pieces = Number.parseInt(eggPieces, 10) || 0;
+  const totalEggs = crates * eggsPerCrate + pieces;
+
   return (
     <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
       <div className="flex items-center gap-2">
         <Egg className="h-4 w-4" />
         <Label className="text-base font-medium">Egg Collection</Label>
+        <span className="text-xs text-muted-foreground ml-auto">{eggsPerCrate} eggs / crate</span>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="eggs-collected">Eggs Collected</Label>
-        <Input
-          id="eggs-collected"
-          type="number"
-          placeholder="0"
-          value={eggsCollected}
-          onChange={(event) => onEggsCollectedChange(event.target.value)}
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="egg-crates">Crates</Label>
+          <Input
+            id="egg-crates"
+            type="number"
+            placeholder="0"
+            min={0}
+            value={eggCrates}
+            onChange={(event) => onEggCratesChange(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="egg-pieces">Extra Pieces</Label>
+          <Input
+            id="egg-pieces"
+            type="number"
+            placeholder="0"
+            min={0}
+            max={eggsPerCrate - 1}
+            value={eggPieces}
+            onChange={(event) => onEggPiecesChange(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Max {eggsPerCrate - 1}</p>
+        </div>
       </div>
 
       <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/45 p-3">
         <span className="font-medium">Total Eggs:</span>
-        <Badge variant="secondary" className="text-lg px-3 py-1">
-          {Number.parseInt(eggsCollected, 10) || 0} eggs
-        </Badge>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            ({crates} crate{crates !== 1 ? 's' : ''} × {eggsPerCrate} + {pieces})
+          </span>
+          <Badge variant="secondary" className="text-lg px-3 py-1">
+            {totalEggs} eggs
+          </Badge>
+        </div>
       </div>
     </div>
   );
@@ -344,6 +379,7 @@ function FeedHealthSection({
 
 function ProductionEntryCard({
   batchUsageStats,
+  eggsPerCrate,
   feedBagsError,
   feedBatches,
   feedInventoryLoading,
@@ -389,10 +425,11 @@ function ProductionEntryCard({
           <Separator className="opacity-60" />
 
           <EggCollectionSection
-            eggsCollected={formData.eggsCollected}
-            onEggsCollectedChange={(value) =>
-              onFormDataChange({ eggsCollected: value })
-            }
+            eggCrates={formData.eggCrates}
+            eggPieces={formData.eggPieces}
+            eggsPerCrate={eggsPerCrate}
+            onEggCratesChange={(value) => onFormDataChange({ eggCrates: value })}
+            onEggPiecesChange={(value) => onFormDataChange({ eggPieces: value })}
           />
 
           <Separator className="opacity-60" />
@@ -423,6 +460,9 @@ function ProductionEntryCard({
 }
 
 function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
+  const totalCrates = Math.floor(todaySummary.totalEggs / EGGS_PER_CRATE);
+  const totalPieces = todaySummary.totalEggs % EGGS_PER_CRATE;
+
   return (
     <Card>
       <CardHeader>
@@ -438,6 +478,9 @@ function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
               {todaySummary.totalEggs}
             </div>
             <div className="text-xs text-muted-foreground">Total Eggs</div>
+            <div className="text-xs text-muted-foreground font-medium">
+              {totalCrates} crate{totalCrates !== 1 ? 's' : ''}{totalPieces > 0 ? ` + ${totalPieces}` : ''}
+            </div>
           </div>
           <div className="space-y-1">
             <div className="text-2xl font-bold text-chart-2">
@@ -451,12 +494,21 @@ function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
 
         <div className="space-y-2">
           {todaySummary.houseBreakdown.length > 0 ? (
-            todaySummary.houseBreakdown.map((house) => (
-              <div key={house.houseId} className="flex justify-between text-sm">
-                <span>{house.houseName}</span>
-                <Badge variant="secondary">{house.eggs} eggs</Badge>
-              </div>
-            ))
+            todaySummary.houseBreakdown.map((house) => {
+              const hCrates = Math.floor(house.eggs / EGGS_PER_CRATE);
+              const hPieces = house.eggs % EGGS_PER_CRATE;
+              return (
+                <div key={house.houseId} className="flex justify-between text-sm">
+                  <span>{house.houseName}</span>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <Badge variant="secondary">{house.eggs} eggs</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {hCrates}c{hPieces > 0 ? ` + ${hPieces}p` : ''}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
           ) : (
             <div className="text-sm text-muted-foreground text-center py-2">
               No logs recorded today
@@ -567,6 +619,7 @@ export function DailyEntryForm() {
   const [selectedHouse, setSelectedHouse] = useState("");
   const [formData, setFormData] = useState({ ...EMPTY_DAILY_LOG_FORM });
   const [feedBagsError, setFeedBagsError] = useState("");
+  const eggsPerCrate = EGGS_PER_CRATE;
   const { houses, loading: housesLoading } = useHouses();
   const {
     feedBatches,
@@ -714,19 +767,29 @@ export function DailyEntryForm() {
 
   const handleImportCsv = async (parsedData: any[]) => {
     try {
-      const payloads: DailyLogPayload[] = parsedData.map((row) => ({
-        logDate: row.Date || row.logDate || todayIsoDate,
-        houseId: Number(row.HouseId || row.houseId),
-        eggsCollected: Number(row.EggsCollected || row.eggsCollected) || 0,
-        crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
-        feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
-        mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
-        notes: String(row.Notes || row.notes || ""),
-      }));
+      const payloads: DailyLogPayload[] = parsedData.map((row) => {
+        // Support both crates+pieces columns and a plain EggsCollected column
+        const crates = Number(row.EggCrates || row.eggCrates) || 0;
+        const pieces = Number(row.EggPieces || row.eggPieces) || 0;
+        const eggsCollected =
+          crates || pieces
+            ? cratesPiecesToEggs(crates, pieces)
+            : Number(row.EggsCollected || row.eggsCollected) || 0;
+
+        return {
+          logDate: row.Date || row.logDate || todayIsoDate,
+          houseId: Number(row.HouseId || row.houseId),
+          eggsCollected,
+          crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
+          feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
+          mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
+          notes: String(row.Notes || row.notes || ""),
+        };
+      });
 
       const validPayloads = payloads.filter((p) => p.houseId);
       if (validPayloads.length === 0) {
-        toast.error("No valid logs found. Exepcted columns: HouseId, Date.");
+        toast.error("No valid logs found. Expected columns: HouseId, Date.");
         return;
       }
 
@@ -745,9 +808,9 @@ export function DailyEntryForm() {
       onDataParsed={handleImportCsv}
       buttonText="Import CSV"
       title="Import Daily Logs CSV"
-      description="Upload a CSV with headers: Date, HouseId, EggsCollected, CrackedEggs, FeedBagsUsed, MortalityCount, Notes"
+      description={`Upload a CSV with headers: Date, HouseId, EggCrates, EggPieces, CrackedEggs, FeedBagsUsed, MortalityCount, Notes. (${eggsPerCrate} eggs per crate)`}
       isLoading={createBulkDailyLogsMutation.isPending}
-      sampleTemplate={"Date,HouseId,EggsCollected,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,100,2,1.5,0,Everything normal"}
+      sampleTemplate={`Date,HouseId,EggCrates,EggPieces,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,4,10,2,1.5,0,Everything normal`}
     />
   );
 
@@ -764,6 +827,7 @@ export function DailyEntryForm() {
         <div className="space-y-6">
           <ProductionEntryCard
             batchUsageStats={batchUsageStats}
+            eggsPerCrate={eggsPerCrate}
             feedBagsError={feedBagsError}
             feedBatches={feedBatches}
             feedInventoryLoading={feedInventoryLoading}

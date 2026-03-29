@@ -8,6 +8,7 @@ export { default as House } from "./House.js";
 
 // Daily operations
 export { default as DailyLog } from "./DailyLog.js";
+export { default as EggAdjustment } from "./EggAdjustment.js";
 
 // Sales & Customers
 export { default as Sales } from "./Sales.js";

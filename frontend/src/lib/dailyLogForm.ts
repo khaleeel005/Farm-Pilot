@@ -1,7 +1,30 @@
 import type { BatchUsageStats, DailyLogPayload } from "@/types";
 
+export const EGGS_PER_CRATE = 30;
+
+/** Convert total egg count into { crates, pieces } */
+export function eggsToCreatesPieces(total: number): { crates: number; pieces: number } {
+  const crates = Math.floor(total / EGGS_PER_CRATE);
+  const pieces = total % EGGS_PER_CRATE;
+  return { crates, pieces };
+}
+
+/** Convert crates + pieces into total egg count */
+export function cratesPiecesToEggs(crates: number, pieces: number): number {
+  return crates * EGGS_PER_CRATE + pieces;
+}
+
+/** Format eggs as "X crate(s) + Y piece(s)" */
+export function formatEggsAsCratesAndPieces(total: number): string {
+  const { crates, pieces } = eggsToCreatesPieces(total);
+  if (crates === 0) return `${pieces} piece${pieces !== 1 ? 's' : ''}`;
+  if (pieces === 0) return `${crates} crate${crates !== 1 ? 's' : ''}`;
+  return `${crates} crate${crates !== 1 ? 's' : ''} + ${pieces} piece${pieces !== 1 ? 's' : ''}`;
+}
+
 export interface DailyLogFormValues {
-  eggsCollected: string;
+  eggCrates: string;
+  eggPieces: string;
   crackedEggs: string;
   mortalityCount: string;
   feedBatchId: string;
@@ -10,7 +33,8 @@ export interface DailyLogFormValues {
 }
 
 export const EMPTY_DAILY_LOG_FORM: DailyLogFormValues = {
-  eggsCollected: "",
+  eggCrates: "",
+  eggPieces: "",
   crackedEggs: "",
   mortalityCount: "",
   feedBatchId: "",
@@ -122,10 +146,12 @@ export function buildDailyLogPayload(
   selectedHouse: string,
   logDate = new Date().toISOString().slice(0, 10),
 ): DailyLogPayload {
+  const crates = Number.parseInt(formData.eggCrates, 10) || 0;
+  const pieces = Number.parseInt(formData.eggPieces, 10) || 0;
   return {
     logDate,
     houseId: Number.parseInt(selectedHouse, 10) || 0,
-    eggsCollected: Number.parseInt(formData.eggsCollected, 10) || 0,
+    eggsCollected: cratesPiecesToEggs(crates, pieces),
     crackedEggs: Number.parseInt(formData.crackedEggs, 10) || 0,
     mortalityCount: Number.parseInt(formData.mortalityCount, 10) || 0,
     feedBatchId: formData.feedBatchId
@@ -141,8 +167,10 @@ export function buildDailyLogPayload(
 export function buildDailyLogUpdatePayload(
   formData: DailyLogFormValues,
 ): Partial<DailyLogPayload> {
+  const crates = Number.parseInt(formData.eggCrates, 10) || 0;
+  const pieces = Number.parseInt(formData.eggPieces, 10) || 0;
   return {
-    eggsCollected: Number.parseInt(formData.eggsCollected, 10) || 0,
+    eggsCollected: cratesPiecesToEggs(crates, pieces),
     crackedEggs: Number.parseInt(formData.crackedEggs, 10) || 0,
     feedBatchId: formData.feedBatchId
       ? Number.parseInt(formData.feedBatchId, 10)

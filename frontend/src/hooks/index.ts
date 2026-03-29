@@ -38,3 +38,5 @@ export {
   useIsOwner,
   useIsStaff,
 } from './usePermission';
+
+export { useEggInventory, useCreateEggAdjustment } from './useEggInventory';

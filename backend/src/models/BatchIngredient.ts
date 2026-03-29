@@ -27,10 +27,6 @@ const BatchIngredient = sequelize.define("BatchIngredient", {
     type: DataTypes.DECIMAL(8, 2),
     allowNull: false,
   },
-  supplier: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  },
 });
 
 export default BatchIngredient;

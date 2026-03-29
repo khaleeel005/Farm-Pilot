@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Package, Plus, Calculator, Trash2, Copy } from "lucide-react";
+import { Package, Plus, Calculator, Trash2, Copy, Pencil } from "lucide-react";
 import type { BatchUsageStats, FeedBatch } from "@/types";
 import type {
   FeedBatchDeleteConfirm,
@@ -90,6 +90,7 @@ interface FeedBatchesTableProps {
   onCreateBatch: () => void;
   onDeleteBatch: (batchId: number, batchName: string) => void;
   onDuplicateBatch: (batch: FeedBatch) => void;
+  onAdjustBatch: (stats: BatchUsageStats) => void;
 }
 
 interface DeleteBatchDialogProps {
@@ -359,27 +360,15 @@ function IngredientCard({
   return (
     <Card className="border-border/70 bg-background/45 p-6 sm:p-7">
       <div className="space-y-5">
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <div className="space-y-3">
-            <Label>Ingredient Name</Label>
-            <Input
-              value={ingredient.ingredientName}
-              onChange={(event) =>
-                onUpdateIngredient(index, "ingredientName", event.target.value)
-              }
-              placeholder="e.g. Corn, Soybean"
-            />
-          </div>
-          <div className="space-y-3">
-            <Label>Supplier (Optional)</Label>
-            <Input
-              value={ingredient.supplier || ""}
-              onChange={(event) =>
-                onUpdateIngredient(index, "supplier", event.target.value)
-              }
-              placeholder="Lagos Grains Ltd"
-            />
-          </div>
+        <div className="space-y-3">
+          <Label>Ingredient Name</Label>
+          <Input
+            value={ingredient.ingredientName}
+            onChange={(event) =>
+              onUpdateIngredient(index, "ingredientName", event.target.value)
+            }
+            placeholder="e.g. Corn, Soybean"
+          />
         </div>
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <div className="space-y-3">
@@ -417,9 +406,14 @@ function IngredientCard({
         </div>
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">Unit Cost</div>
-          {ingredient.quantityKg > 0 && ingredient.totalCost > 0 ? (
+          {Number(ingredient.quantityKg) > 0 &&
+          Number(ingredient.totalCost) > 0 ? (
             <div className="font-medium text-foreground">
-              ₦{(ingredient.totalCost / ingredient.quantityKg).toFixed(2)}/kg
+              ₦
+              {(
+                Number(ingredient.totalCost) / Number(ingredient.quantityKg)
+              ).toFixed(2)}
+              /kg
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">-</div>
@@ -548,6 +542,7 @@ function FeedBatchesTable({
   onCreateBatch,
   onDeleteBatch,
   onDuplicateBatch,
+  onAdjustBatch,
 }: FeedBatchesTableProps) {
   return (
     <Card>
@@ -596,6 +591,7 @@ function FeedBatchesTable({
                     isDeleting={isDeleting}
                     onDeleteBatch={onDeleteBatch}
                     onDuplicateBatch={onDuplicateBatch}
+                    onAdjustBatch={onAdjustBatch}
                     usageStats={
                       batchUsageStats.find(
                         (stat) => stat.batchId === batch.id,
@@ -619,6 +615,7 @@ function FeedBatchRow({
   isDeleting,
   onDeleteBatch,
   onDuplicateBatch,
+  onAdjustBatch,
   usageStats,
 }: {
   batch: FeedBatch;
@@ -627,6 +624,7 @@ function FeedBatchRow({
   isDeleting: boolean;
   onDeleteBatch: (batchId: number, batchName: string) => void;
   onDuplicateBatch: (batch: FeedBatch) => void;
+  onAdjustBatch: (stats: BatchUsageStats) => void;
   usageStats: BatchUsageStats | null;
 }) {
   const usagePercentage = usageStats?.usagePercentage ?? 0;
@@ -656,9 +654,20 @@ function FeedBatchRow({
       </TableCell>
       <TableCell>
         <div className="text-sm">
-          <div className="font-medium">
+          <div className="font-medium flex items-center gap-1">
             {usageStats?.bagsUsed ?? 0} /{" "}
             {usageStats?.remainingBags ?? batch.totalBags}
+            {usageStats && canCreate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 ml-1 text-muted-foreground hover:text-foreground"
+                onClick={() => onAdjustBatch(usageStats)}
+                title="Adjust remaining bags manually"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           <div className="text-muted-foreground text-xs">Used / Remaining</div>
         </div>
@@ -836,11 +845,13 @@ export function FeedManagement() {
     error,
     refresh,
     createBatch,
+    updateBatch,
     deleteBatch,
     estimateBatchCost,
     isCreating,
     isDeleting,
     isCalculating,
+    isMutating,
   } = useFeedManagement();
   const { canCreate, canDelete } = useResourcePermissions("FEED");
   const toast = useToastContext();
@@ -875,7 +886,6 @@ export function FeedManagement() {
         ingredientName: ing.ingredientName,
         quantityKg: ing.quantityKg,
         totalCost: ing.totalCost,
-        supplier: ing.supplier || "",
       })) || [createEmptyIngredientInput()],
     });
     setShowNewBatch(true);
@@ -942,6 +952,40 @@ export function FeedManagement() {
         "error",
         "Calculation Failed",
         "Failed to calculate cost. Please check your inputs and try again.",
+      );
+    }
+  };
+
+  const [adjustBatch, setAdjustBatch] = useState<BatchUsageStats | null>(null);
+  const [adjustRemaining, setAdjustRemaining] = useState<string>("");
+
+  const handleAdjustStock = async () => {
+    if (!adjustBatch || adjustRemaining === "") return;
+    const newRemaining = Number(adjustRemaining);
+    if (newRemaining < 0) {
+      notifyToast(
+        toast,
+        "error",
+        "Invalid Stock",
+        "Remaining bags cannot be negative.",
+      );
+      return;
+    }
+    
+    // manualDeductions = totalBags - bagsUsed - newRemaining
+    const newManualDeduction = adjustBatch.totalBags - adjustBatch.bagsUsed - newRemaining;
+    
+    try {
+      await updateBatch(adjustBatch.batchId, { manualDeductions: newManualDeduction });
+      notifyToast(toast, "success", "Success", "Bags remaining updated successfully!");
+      setAdjustBatch(null);
+      setAdjustRemaining("");
+    } catch (err) {
+      notifyToast(
+        toast,
+        "error",
+        "Correction Failed",
+        err instanceof Error ? err.message : "Could not update bags remaining.",
       );
     }
   };
@@ -1129,6 +1173,10 @@ export function FeedManagement() {
         onCreateBatch={() => setShowNewBatch(true)}
         onDeleteBatch={requestDeleteBatch}
         onDuplicateBatch={handleDuplicateBatch}
+        onAdjustBatch={(stats) => {
+          setAdjustBatch(stats);
+          setAdjustRemaining(String(stats.remainingBags));
+        }}
       />
 
       <DeleteBatchDialog
@@ -1142,6 +1190,42 @@ export function FeedManagement() {
         errors={formErrors}
         onClose={() => setFormErrors([])}
       />
+      
+      <Dialog open={adjustBatch !== null} onOpenChange={(open) => !open && setAdjustBatch(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Adjust Bags Remaining</DialogTitle>
+            <DialogDescription>
+              Correct the physical bag count currently in your warehouse for batch "{adjustBatch?.batchName}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Actual Bags Remaining</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={adjustRemaining}
+                onChange={(e) => setAdjustRemaining(e.target.value)}
+                placeholder="e.g. 20"
+              />
+              <p className="text-xs text-muted-foreground">
+                Note: Setting this to a new value directly offsets your inventory balance by recording a manual lost/spilled deduction.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-3">
+            <Button variant="outline" onClick={() => setAdjustBatch(null)} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button onClick={() => { void handleAdjustStock(); }} className="w-full sm:w-auto" disabled={isMutating}>
+              <Pencil className="h-4 w-4 mr-2" />
+              {isMutating ? "Updating..." : "Save Correction"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

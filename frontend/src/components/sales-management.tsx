@@ -34,6 +34,7 @@ import {
   useResourcePermissions,
   useSales,
   useToastContext,
+  useEggInventory,
 } from "@/hooks";
 import {
   buildCustomerPayload,
@@ -41,6 +42,7 @@ import {
   calculateSaleFormTotal,
   createEmptyCustomerForm,
   createEmptySaleForm,
+  getTodayDateValue,
   type CustomerFormData,
   type SaleFormData,
 } from "@/lib/salesManagement";
@@ -72,6 +74,12 @@ export function SalesManagement() {
     isCreatingSale,
     isCreatingCustomer,
   } = useSales();
+  
+  const todayDate = useMemo(() => getTodayDateValue(), []);
+  const { inventory } = useEggInventory(todayDate, todayDate);
+  const availableCrates = inventory?.netStockCrates ?? 0;
+  const availablePieces = inventory?.netStockPieces ?? 0;
+  
   const [showNewSale, setShowNewSale] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showImportCsv, setShowImportCsv] = useState(false);
@@ -365,13 +373,18 @@ export function SalesManagement() {
       <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         {showNewSale && (
           <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="display-heading text-2xl">
-                New Sale Entry
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Record a new sale transaction
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between">
+              <div>
+                <CardTitle className="display-heading text-2xl">
+                  New Sale Entry
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Record a new sale transaction
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="px-3 py-1 text-sm font-medium">
+                Stock: {availableCrates}c {availablePieces > 0 ? `+ ${availablePieces}p` : ""}
+              </Badge>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 xl:grid-cols-2">
@@ -422,12 +435,20 @@ export function SalesManagement() {
                     <Label>Quantity (crates)</Label>
                     <Input
                       type="number"
+                      min="1"
+                      step="1"
                       placeholder="0"
                       value={saleForm.quantity}
                       onChange={(event) =>
                         handleSaleFieldChange("quantity", event.target.value)
                       }
+                      className={(parseInt(saleForm.quantity) || 0) > availableCrates ? "border-destructive focus-visible:ring-destructive" : ""}
                     />
+                    {saleForm.quantity && (parseInt(saleForm.quantity) || 0) > availableCrates && (
+                      <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                        ⚠️ You are selling {(parseInt(saleForm.quantity) || 0) - availableCrates} crates more than current stock.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Price per Crate (₦)</Label>

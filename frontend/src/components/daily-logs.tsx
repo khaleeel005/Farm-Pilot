@@ -55,8 +55,11 @@ import type { DailyLog, DailyLogPayload } from '@/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
+  EGGS_PER_CRATE,
   EMPTY_DAILY_LOG_FORM,
   buildDailyLogUpdatePayload,
+  cratesPiecesToEggs,
+  eggsToCreatesPieces,
 } from '@/lib/dailyLogForm';
 
 export function DailyLogs() {
@@ -118,8 +121,10 @@ export function DailyLogs() {
 
   const openEditDialog = (log: DailyLog) => {
     setEditingLog(log);
+    const { crates, pieces } = eggsToCreatesPieces(log.eggsCollected || 0);
     setEditForm({
-      eggsCollected: String(log.eggsCollected || 0),
+      eggCrates: String(crates),
+      eggPieces: String(pieces),
       crackedEggs: String(log.crackedEggs || 0),
       feedBatchId: log.feedBatchId ? String(log.feedBatchId) : '',
       feedBagsUsed: String(log.feedBagsUsed || 0),
@@ -152,19 +157,28 @@ export function DailyLogs() {
 
   const handleImportCsv = async (parsedData: any[]) => {
     try {
-      const payloads: DailyLogPayload[] = parsedData.map((row) => ({
-        logDate: row.Date || row.logDate || format(new Date(), 'yyyy-MM-dd'),
-        houseId: Number(row.HouseId || row.houseId),
-        eggsCollected: Number(row.EggsCollected || row.eggsCollected) || 0,
-        crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
-        feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
-        mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
-        notes: String(row.Notes || row.notes || ""),
-      }));
+      const payloads: DailyLogPayload[] = parsedData.map((row) => {
+        const crates = Number(row.EggCrates || row.eggCrates) || 0;
+        const pieces = Number(row.EggPieces || row.eggPieces) || 0;
+        const eggsCollected =
+          crates || pieces
+            ? cratesPiecesToEggs(crates, pieces)
+            : Number(row.EggsCollected || row.eggsCollected) || 0;
+
+        return {
+          logDate: row.Date || row.logDate || format(new Date(), 'yyyy-MM-dd'),
+          houseId: Number(row.HouseId || row.houseId),
+          eggsCollected,
+          crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
+          feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
+          mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
+          notes: String(row.Notes || row.notes || ""),
+        };
+      });
 
       const validPayloads = payloads.filter((p) => p.houseId);
       if (validPayloads.length === 0) {
-        toast.error("No valid logs found. Exepcted columns: HouseId, Date.");
+        toast.error("No valid logs found. Expected columns: HouseId, Date.");
         return;
       }
 
@@ -186,9 +200,9 @@ export function DailyLogs() {
           onDataParsed={handleImportCsv}
           buttonText="Import CSV"
           title="Import Daily Logs CSV"
-          description="Upload a CSV with headers: Date, HouseId, EggsCollected, CrackedEggs, FeedBagsUsed, MortalityCount, Notes"
+          description={`Upload a CSV with headers: Date, HouseId, EggCrates, EggPieces, CrackedEggs, FeedBagsUsed, MortalityCount, Notes. (${EGGS_PER_CRATE} eggs per crate)`}
           isLoading={createBulkDailyLogsMutation.isPending}
-          sampleTemplate={"Date,HouseId,EggsCollected,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,100,2,1.5,0,Everything normal"}
+          sampleTemplate={`Date,HouseId,EggCrates,EggPieces,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,4,10,2,1.5,0,Everything normal`}
         />
       )}
       <Button variant="outline" size="icon" onClick={goToPreviousDay}>
@@ -280,15 +294,31 @@ export function DailyLogs() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="eggsCollected">Eggs Collected</Label>
+                <Label htmlFor="eggCrates">Crates</Label>
                 <Input
-                  id="eggsCollected"
+                  id="eggCrates"
                   type="number"
                   min="0"
-                  value={editForm.eggsCollected}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, eggsCollected: e.target.value }))}
+                  value={editForm.eggCrates}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, eggCrates: e.target.value }))}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="eggPieces">Extra Pieces</Label>
+                <Input
+                  id="eggPieces"
+                  type="number"
+                  min="0"
+                  max={EGGS_PER_CRATE - 1}
+                  value={editForm.eggPieces}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, eggPieces: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Total: {cratesPiecesToEggs(Number(editForm.eggCrates) || 0, Number(editForm.eggPieces) || 0)} eggs
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="crackedEggs">Cracked Eggs</Label>
                 <Input
@@ -299,8 +329,6 @@ export function DailyLogs() {
                   onChange={(e) => setEditForm((prev) => ({ ...prev, crackedEggs: e.target.value }))}
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="feedBatch">Feed Batch</Label>
                 <Select
@@ -320,6 +348,8 @@ export function DailyLogs() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="feedBagsUsed">Bags Used</Label>
                 <Input
@@ -442,7 +472,7 @@ export function DailyLogs() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>House</TableHead>
-                    <TableHead className="text-right">Eggs</TableHead>
+                    <TableHead className="text-right">Eggs (crates+pieces)</TableHead>
                     <TableHead className="text-right">Cracked</TableHead>
                     <TableHead>Feed Batch</TableHead>
                     <TableHead className="text-right">Bags Used</TableHead>
@@ -457,7 +487,17 @@ export function DailyLogs() {
                       <TableCell className="font-medium">
                         {log.House?.houseName || `House ${log.houseId}`}
                       </TableCell>
-                      <TableCell className="text-right">{log.eggsCollected || 0}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span>{log.eggsCollected || 0}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {Math.floor((log.eggsCollected || 0) / EGGS_PER_CRATE)}c
+                            {(log.eggsCollected || 0) % EGGS_PER_CRATE > 0
+                              ? ` + ${(log.eggsCollected || 0) % EGGS_PER_CRATE}p`
+                              : ''}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         {log.crackedEggs ? (
                           <Badge variant="outline" className="text-orange-600">

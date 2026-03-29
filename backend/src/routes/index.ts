@@ -10,6 +10,7 @@ import labor from "./labor.js";
 import costs from "./costs.js";
 import costEntries from "./costEntries.js";
 import reports from "./reports.js";
+import inventory from "./inventory.js";
 
 const router = express.Router();
 
@@ -37,5 +38,8 @@ router.use("/cost-entries", costEntries);
 
 // Reporting
 router.use("/reports", reports);
+
+// Inventory
+router.use("/inventory", inventory);
 
 export default router;

@@ -8,7 +8,6 @@ export interface Ingredient {
   quantityKg: number;
   totalCost: number;
   costPerKg: number;
-  supplier?: string | null;
 }
 
 /**
@@ -25,6 +24,7 @@ export interface FeedBatch {
   costPerBag: number;
   costPerKg: number;
   miscellaneousCost: number;
+  manualDeductions: number;
   createdAt?: string;
   updatedAt?: string;
   // Included associations
@@ -56,7 +56,8 @@ export interface FeedBatchPayload {
   bagSizeKg?: number;
   totalBags?: number;
   miscellaneousCost?: number;
-  ingredients: Ingredient[];
+  manualDeductions?: number;
+  ingredients?: Ingredient[];
 }
 
 /**

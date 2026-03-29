@@ -68,7 +68,8 @@ export function calculateAverageSellingPrice(sales: Sale[]): number {
     { revenue: 0, quantity: 0 },
   );
 
-  return totals.quantity > 0 ? totals.revenue / totals.quantity : 0;
+  const EGGS_PER_CRATE = 30;
+  return totals.quantity > 0 ? (totals.revenue / totals.quantity) / EGGS_PER_CRATE : 0;
 }
 
 export function buildCostBreakdown(costEstimate: CostEstimate | null): CostBreakdown {

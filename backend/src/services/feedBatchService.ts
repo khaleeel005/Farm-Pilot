@@ -128,7 +128,6 @@ const feedBatchService = {
         quantityKg: ingredient.quantityKg,
         totalCost: ingredient.totalCost,
         costPerKg: Number(ingredient.totalCost) / Number(ingredient.quantityKg),
-        supplier: ingredient.supplier || null,
       }));
 
       await BatchIngredient.bulkCreate(ingredientsWithBatchId, { transaction });
@@ -234,7 +233,6 @@ const feedBatchService = {
             totalCost: ingredient.totalCost,
             costPerKg:
               Number(ingredient.totalCost) / Number(ingredient.quantityKg),
-            supplier: ingredient.supplier || null,
           }),
         );
         await BatchIngredient.bulkCreate(ingredientsWithBatchId, {
@@ -309,7 +307,6 @@ const feedBatchService = {
           quantityKg: ingredientData.quantityKg,
           totalCost: ingredientData.totalCost,
           costPerKg,
-          supplier: ingredientData.supplier || null,
         },
         { transaction },
       );

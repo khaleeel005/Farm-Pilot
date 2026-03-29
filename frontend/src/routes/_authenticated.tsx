@@ -29,6 +29,7 @@ import {
   Leaf,
   ShieldCheck,
   Tractor,
+  Layers,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 
@@ -77,6 +78,7 @@ function AuthenticatedLayout() {
       icon: CircleDollarSign,
       path: "/sales",
     },
+    { id: "inventory", label: "Inventory", icon: Layers, path: "/inventory" },
     { id: "feed", label: "Feed Management", icon: Package, path: "/feed" },
     { id: "houses", label: "House Management", icon: Egg, path: "/houses" },
     { id: "labor", label: "Labor", icon: Users, path: "/labor" },
@@ -95,6 +97,7 @@ function AuthenticatedLayout() {
       path: "/daily-entry",
     },
     { id: "sales", label: "Sales", icon: CircleDollarSign, path: "/sales" },
+    { id: "inventory", label: "Inventory", icon: Layers, path: "/inventory" },
     { id: "feed", label: "Feed Management", icon: Package, path: "/feed" },
     { id: "houses", label: "House Management", icon: Egg, path: "/houses" },
     { id: "labor", label: "Labor", icon: Users, path: "/labor" },

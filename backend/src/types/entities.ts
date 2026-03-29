@@ -52,6 +52,7 @@ export interface FeedBatchEntity {
   costPerBag: Numeric;
   costPerKg: Numeric;
   miscellaneousCost: Numeric;
+  manualDeductions: Numeric;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -63,7 +64,6 @@ export interface BatchIngredientEntity {
   quantityKg: Numeric;
   totalCost: Numeric;
   costPerKg: Numeric;
-  supplier?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
