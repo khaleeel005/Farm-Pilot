@@ -3,10 +3,16 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.renameColumn('Sales', 'pricePerEgg', 'pricePerCrate');
+    const tableDescription = await queryInterface.describeTable('Sales');
+    if (tableDescription.price_per_egg) {
+      await queryInterface.renameColumn('Sales', 'price_per_egg', 'price_per_crate');
+    }
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.renameColumn('Sales', 'pricePerCrate', 'pricePerEgg');
+    const tableDescription = await queryInterface.describeTable('Sales');
+    if (tableDescription.price_per_crate) {
+      await queryInterface.renameColumn('Sales', 'price_per_crate', 'price_per_egg');
+    }
   }
 };
