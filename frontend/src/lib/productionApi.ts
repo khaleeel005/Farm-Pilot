@@ -88,3 +88,15 @@ export async function deleteDailyLog(id: number | string) {
   });
   return handleResponse(res);
 }
+
+export async function createBulkDailyLogs(
+  payloads: DailyLogPayload[],
+): Promise<DailyLog[]> {
+  const res = await fetchWithAuth(`${BASE}/api/daily-logs/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payloads),
+  });
+  const data = await handleResponse<{ data?: DailyLog[] }>(res);
+  return data?.data || [];
+}

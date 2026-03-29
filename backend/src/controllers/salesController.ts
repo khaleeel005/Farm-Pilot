@@ -11,6 +11,19 @@ const salesController = {
     }
   },
 
+  createBulk: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sales = await salesService.createSalesBulk(req.body);
+      res.status(201).json({
+        success: true,
+        data: sales,
+        message: `${sales.length} sales added successfully`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getAll: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sales = await salesService.getAllSales(req.query);

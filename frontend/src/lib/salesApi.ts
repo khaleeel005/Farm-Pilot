@@ -88,3 +88,15 @@ export async function deleteSale(id: number | string) {
   });
   return handleResponse(res);
 }
+
+export async function createBulkSales(
+  payloads: SalePayload[],
+): Promise<Sale[]> {
+  const res = await fetchWithAuth(`${BASE}/api/sales/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payloads),
+  });
+  const data = await handleResponse<{ data?: Sale[] }>(res);
+  return data?.data || [];
+}

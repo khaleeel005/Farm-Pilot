@@ -43,11 +43,11 @@ const reportService = {
       (s, r) => s + (Number(r.totalAmount) || 0),
       0
     );
-    const totalEggs = rows.reduce(
+    const totalCrates = rows.reduce(
       (s, r) => s + (Number(r.quantity) || 0),
       0
     );
-    return { start, end, totalAmount, totalEggs, rows };
+    return { start, end, totalAmount, totalCrates, rows };
   },
 
   getFinancialReport: async (start: string | undefined, end: string | undefined) => {
@@ -97,7 +97,7 @@ const reportService = {
       data = r.rows.map((s) => ({
         date: s.saleDate,
         quantity: s.quantity,
-        pricePerEgg: s.pricePerEgg,
+        pricePerCrate: s.pricePerCrate,
         totalAmount: s.totalAmount,
       }));
     } else if (type === "financial") {
@@ -146,7 +146,7 @@ const reportService = {
       rows = r.rows.map((s) => ({
         date: s.saleDate,
         quantity: s.quantity,
-        pricePerEgg: s.pricePerEgg,
+        pricePerCrate: s.pricePerCrate,
         totalAmount: s.totalAmount,
       }));
     } else if (type === "financial") {

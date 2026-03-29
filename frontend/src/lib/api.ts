@@ -10,6 +10,7 @@ export { getCurrentUser, login, logout } from "@/lib/authApi";
 export { createStaff, deleteStaff, listStaff, updateStaff } from "@/lib/staffApi";
 export {
   createDailyLog,
+  createBulkDailyLogs,
   createHouse,
   deleteDailyLog,
   deleteHouse,
@@ -46,6 +47,7 @@ export {
   getSalesReport,
 } from "@/lib/reportsApi";
 export {
+  createBulkSales,
   createCustomer,
   createSale,
   deleteCustomer,

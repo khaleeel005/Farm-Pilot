@@ -60,9 +60,8 @@ const EMPTY_METRICS: ReportsMetrics = {
   crackedEggs: 0,
   crackedPercent: 0,
   totalRevenue: 0,
-  totalEggsSold: 0,
-  totalDozens: 0,
-  avgPricePerDozen: 0,
+  totalCratesSold: 0,
+  avgPricePerCrate: 0,
   paidTransactions: 0,
   pendingTransactions: 0,
   totalOperatingCosts: 0,
@@ -244,7 +243,7 @@ function OverviewTabContent({
               ₦{metrics.totalRevenue.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              {metrics.totalDozens} dozens sold
+              {metrics.totalCratesSold} crates sold
             </p>
           </CardContent>
         </Card>
@@ -439,12 +438,12 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
-              Dozens Sold
+              Crates Sold
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold">
-              {metrics.totalDozens.toLocaleString()}
+              {metrics.totalCratesSold.toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -452,12 +451,12 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
-              Avg Price/Dozen
+              Avg Price/Crate
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-lg sm:text-2xl font-bold truncate">
-              ₦{Math.round(metrics.avgPricePerDozen).toLocaleString()}
+              ₦{Math.round(metrics.avgPricePerCrate).toLocaleString()}
             </div>
           </CardContent>
         </Card>

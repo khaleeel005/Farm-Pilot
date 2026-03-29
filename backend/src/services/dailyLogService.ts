@@ -186,6 +186,21 @@ const dailyLogService = {
     }
   },
 
+  createDailyLogsBulk: async (dataArray: DailyLogInput[]) => {
+    if (!dataArray || !Array.isArray(dataArray) || dataArray.length === 0) {
+      throw new BadRequestError("An array of daily logs is required");
+    }
+
+    const createdLogs = [];
+    for (const data of dataArray) {
+      // Use existing createDailyLog to handle upserts and feed validation correctly
+      const log = await dailyLogService.createDailyLog(data);
+      createdLogs.push(log);
+    }
+
+    return createdLogs;
+  },
+
   createDailyLog: async (data: DailyLogInput) => {
     const payload = pickDailyLogPayload(data);
 

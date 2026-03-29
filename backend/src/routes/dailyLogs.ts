@@ -26,6 +26,13 @@ router.get(
 
 router.get("/:id", authorize(PERMISSIONS.DAILY_LOGS.READ), validateId, handleValidation, dailyLogController.getById);
 
+// POST /bulk - both owner and staff can create
+router.post(
+  "/bulk",
+  authorize(PERMISSIONS.DAILY_LOGS.CREATE),
+  dailyLogController.createBulk
+);
+
 // POST - both owner and staff can create
 router.post(
   "/",

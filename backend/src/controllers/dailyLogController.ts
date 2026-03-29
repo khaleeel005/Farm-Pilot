@@ -25,6 +25,19 @@ const dailyLogController = {
     }
   },
 
+  createBulk: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const logs = await dailyLogService.createDailyLogsBulk(req.body);
+      res.status(201).json({
+        success: true,
+        data: logs,
+        message: `${logs.length} daily logs processed successfully`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   getAll: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const logs = await dailyLogService.getAllDailyLogs(req.query);

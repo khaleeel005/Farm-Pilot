@@ -2,7 +2,7 @@ export { useHouses } from './useHouses';
 export type { UseHousesReturn } from './useHouses';
 
 export { useDailyLogs } from './useDailyLogs';
-export { useCreateDailyLog, useDeleteDailyLog, useUpdateDailyLog } from './useDailyLogs';
+export { useCreateBulkDailyLogs, useCreateDailyLog, useDeleteDailyLog, useUpdateDailyLog } from './useDailyLogs';
 export type { UseDailyLogsReturn } from './useDailyLogs';
 export type { DailyLogFilters } from '@/lib/dailyLogs';
 

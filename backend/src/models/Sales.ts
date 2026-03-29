@@ -13,14 +13,14 @@ const Sales = sequelize.define("Sales", {
   },
   customerId: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
   },
   quantity: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0,
   },
-  pricePerEgg: {
+  pricePerCrate: {
     type: DataTypes.DECIMAL(8, 2),
     allowNull: false,
     defaultValue: 0,

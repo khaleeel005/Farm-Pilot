@@ -2,7 +2,6 @@ import "./config/loadEnv.js";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import routes from "./routes/index.js";
 import { autoMigrate } from "./utils/database.js";
 import { initializeAdmin } from "./utils/initAdmin.js";
@@ -63,31 +62,7 @@ app.use(
   }),
 );
 
-// Rate limiting - higher limit in development, stricter in production
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: dev ? 1000 : 100,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
-// Apply rate limiting to API routes only
-app.use("/api", limiter);
-
-// Stricter rate limit for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: dev ? 100 : 10,
-  message: {
-    success: false,
-    message: "Too many login attempts, please try again later.",
-  },
-});
-app.use("/api/auth/login", authLimiter);
 
 // Body parsing
 app.use(express.json({ limit: "10kb" }));

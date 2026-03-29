@@ -20,11 +20,11 @@ export interface SalesReportData {
   start: string;
   end: string;
   totalAmount: number;
-  totalEggs: number;
+  totalCrates: number;
   rows: Array<{
     saleDate: string;
     quantity: number;
-    pricePerEgg: number;
+    pricePerCrate: number;
     totalAmount: number;
     customerId?: number;
     paymentStatus?: string;
@@ -55,7 +55,7 @@ export interface DashboardSummary {
   };
   sales: {
     totalRevenue: number;
-    totalEggsSold: number;
+    totalCratesSold: number;
     pendingPayments: number;
     paidCount: number;
     pendingCount: number;
@@ -108,7 +108,7 @@ export async function getSalesReport(
       start: startDate,
       end: endDate,
       totalAmount: 0,
-      totalEggs: 0,
+      totalCrates: 0,
       rows: [],
     }
   );
@@ -165,7 +165,7 @@ export async function getDashboardSummary(
   const crackedPercent = totalEggs > 0 ? (crackedEggs / totalEggs) * 100 : 0;
 
   const totalRevenue = sales?.totalAmount || 0;
-  const totalEggsSold = sales?.totalEggs || 0;
+  const totalCratesSold = sales?.totalCrates || 0;
   const paidCount =
     sales?.rows.filter((row) => row.paymentStatus === "paid").length || 0;
   const pendingCount =
@@ -189,7 +189,7 @@ export async function getDashboardSummary(
     },
     sales: {
       totalRevenue,
-      totalEggsSold,
+      totalCratesSold,
       pendingPayments,
       paidCount,
       pendingCount,

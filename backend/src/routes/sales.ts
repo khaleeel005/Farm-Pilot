@@ -20,8 +20,12 @@ router.get("/", authorize(PERMISSIONS.SALES.READ), validateSalesQueries, handleV
 
 router.get("/:id", authorize(PERMISSIONS.SALES.READ), validateId, handleValidation, salesController.getById);
 
+// POST /bulk - owner only
+router.post("/bulk", authorize(PERMISSIONS.SALES.CREATE), salesController.createBulk);
+
 // POST - owner only
 router.post("/", authorize(PERMISSIONS.SALES.CREATE), validateCreateSale, handleValidation, salesController.create);
+
 
 // PUT - owner only
 router.put("/:id", authorize(PERMISSIONS.SALES.UPDATE), validateUpdateSale, handleValidation, salesController.update);

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import {
   createDailyLog,
+  createBulkDailyLogs,
   deleteDailyLog,
   getDailyLogs,
   updateDailyLog,
@@ -75,6 +76,22 @@ export function useCreateDailyLog() {
 
   return useMutation({
     mutationFn: (payload: DailyLogPayload) => createDailyLog(payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY }),
+        queryClient.invalidateQueries({
+          queryKey: FEED_BATCH_USAGE_STATS_QUERY_KEY,
+        }),
+      ]);
+    },
+  });
+}
+
+export function useCreateBulkDailyLogs() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payloads: DailyLogPayload[]) => createBulkDailyLogs(payloads),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: DAILY_LOGS_QUERY_KEY }),

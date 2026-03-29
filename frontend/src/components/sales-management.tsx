@@ -55,6 +55,8 @@ import {
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
+import { CsvUploader } from "@/components/shared/csv-uploader";
+import type { SalePayload } from "@/types";
 
 export function SalesManagement() {
   const {
@@ -64,6 +66,7 @@ export function SalesManagement() {
     error,
     refresh,
     createSale,
+    createBulkSales,
     createCustomer,
     summary,
     isCreatingSale,
@@ -71,6 +74,7 @@ export function SalesManagement() {
   } = useSales();
   const [showNewSale, setShowNewSale] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [showImportCsv, setShowImportCsv] = useState(false);
   const [saleForm, setSaleForm] = useState<SaleFormData>(() =>
     createEmptySaleForm(),
   );
@@ -112,11 +116,6 @@ export function SalesManagement() {
   );
 
   const handleCreateSale = useCallback(async () => {
-    if (!saleForm.customerId) {
-      toast.error("Please select a customer.");
-      return;
-    }
-
     const payload = buildSalePayload(saleForm);
 
     if (payload.quantity <= 0) {
@@ -183,8 +182,49 @@ export function SalesManagement() {
     );
   }
 
+  const handleImportCsv = useCallback(
+    async (parsedData: any[]) => {
+      try {
+        const payloads: SalePayload[] = parsedData.map((row) => ({
+          saleDate: row.Date || row.saleDate,
+          quantity: Number(row.Quantity || row.quantity) || 0,
+          pricePerCrate: Number(row.UnitPrice || row.pricePerCrate || row.pricePerEgg) || 0,
+          totalAmount: (Number(row.Quantity || row.quantity) || 0) * (Number(row.UnitPrice || row.pricePerCrate || row.pricePerEgg) || 0),
+          paymentMethod: row.PaymentMethod || row.paymentMethod || "cash",
+          paymentStatus: row.PaymentStatus || row.paymentStatus || "paid",
+        }));
+
+        const validPayloads = payloads.filter((p) => p.saleDate && p.quantity > 0);
+        if (validPayloads.length === 0) {
+          toast.error("No valid headers found. Expected: Date, Quantity, UnitPrice.");
+          return;
+        }
+
+        await createBulkSales(validPayloads);
+        setShowImportCsv(false);
+        toast.success(`Successfully imported ${validPayloads.length} sales`);
+        void refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to import CSV");
+      }
+    },
+    [createBulkSales, refresh, toast],
+  );
+
   const headerActions = (
     <div className="flex gap-2">
+      {canCreateSale && (
+        <CsvUploader
+          isOpen={showImportCsv}
+          onOpenChange={setShowImportCsv}
+          onDataParsed={handleImportCsv}
+          buttonText="Import CSV"
+          title="Import Sales CSV"
+          description="Upload a CSV with headers: Date, Quantity, UnitPrice, PaymentMethod, PaymentStatus"
+          isLoading={isCreatingSale}
+          sampleTemplate={"Date,Quantity,UnitPrice,PaymentMethod,PaymentStatus\n2026-03-20,10,3500,cash,paid"}
+        />
+      )}
       {canCreateCustomer && (
         <Button variant="outline" onClick={() => setShowNewCustomer(true)}>
           <Users className="mr-2 h-4 w-4" />
@@ -303,9 +343,9 @@ export function SalesManagement() {
           icon={DollarSign}
         />
         <SummaryCard
-          title="Eggs Sold Today"
-          value={String(Math.floor(summary.todayEggs / 12))}
-          description={`${summary.todayEggs} individual eggs`}
+          title="Crates Sold Today"
+          value={String(summary.todayCrates)}
+          description={`${summary.todayCrates} crate${summary.todayCrates !== 1 ? "s" : ""} sold`}
           icon={DollarSign}
         />
         <SummaryCard
@@ -336,7 +376,7 @@ export function SalesManagement() {
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 gap-4 rounded-xl border border-border/70 bg-background/55 p-4 xl:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="customer">Customer *</Label>
+                  <Label htmlFor="customer">Customer (optional)</Label>
                   <Select
                     value={saleForm.customerId}
                     onValueChange={(value) =>
@@ -344,7 +384,7 @@ export function SalesManagement() {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
+                      <SelectValue placeholder="Walk-in / No customer" />
                     </SelectTrigger>
                     <SelectContent>
                       {customers.map((customer) => (
@@ -374,12 +414,12 @@ export function SalesManagement() {
 
               <div className="space-y-4 rounded-xl border border-border/70 bg-background/55 p-4">
                 <Label className="text-sm font-medium sm:text-base">
-                  Egg Quantity & Pricing
+                  Crate Quantity & Pricing
                 </Label>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Quantity (eggs)</Label>
+                    <Label>Quantity (crates)</Label>
                     <Input
                       type="number"
                       placeholder="0"
@@ -390,14 +430,14 @@ export function SalesManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Price per Egg (₦)</Label>
+                    <Label>Price per Crate (₦)</Label>
                     <Input
                       type="number"
                       placeholder="0"
-                      value={saleForm.pricePerEgg}
+                      value={saleForm.pricePerCrate}
                       onChange={(event) =>
                         handleSaleFieldChange(
-                          "pricePerEgg",
+                          "pricePerCrate",
                           event.target.value,
                         )
                       }
@@ -488,7 +528,7 @@ export function SalesManagement() {
                     <TableHead>ID</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Eggs</TableHead>
+                    <TableHead>Crates</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -498,7 +538,7 @@ export function SalesManagement() {
                     <SaleRow
                       key={sale.id}
                       sale={sale}
-                      customer={customerNames.get(sale.customerId)}
+                      customer={sale.customerId != null ? customerNames.get(sale.customerId) : undefined}
                     />
                   ))}
                 </TableBody>
@@ -581,7 +621,7 @@ function SaleRow({
   sale: Sale;
   customer?: Customer;
 }) {
-  const totalEggs = Number(sale.quantity) || 0;
+  const totalCrates = Number(sale.quantity) || 0;
 
   return (
     <TableRow>
@@ -589,7 +629,7 @@ function SaleRow({
       <TableCell>{sale.customer?.customerName || customer?.customerName || "Unknown"}</TableCell>
       <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
       <TableCell>
-        {totalEggs} ({Math.floor(totalEggs / 12)} dz)
+        {totalCrates}
       </TableCell>
       <TableCell>₦{Number(sale.totalAmount).toLocaleString()}</TableCell>
       <TableCell>

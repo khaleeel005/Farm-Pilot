@@ -35,9 +35,8 @@ export interface ReportsMetrics {
   crackedEggs: number;
   crackedPercent: number;
   totalRevenue: number;
-  totalEggsSold: number;
-  totalDozens: number;
-  avgPricePerDozen: number;
+  totalCratesSold: number;
+  avgPricePerCrate: number;
   paidTransactions: number;
   pendingTransactions: number;
   totalOperatingCosts: number;
@@ -108,9 +107,8 @@ export function buildReportsOverviewData(input: {
     totalEggs > 0 ? Math.round((crackedEggs / totalEggs) * 100 * 10) / 10 : 0;
 
   const totalRevenue = salesData?.totalAmount || 0;
-  const totalEggsSold = salesData?.totalEggs || 0;
-  const totalDozens = Math.floor(totalEggsSold / 12);
-  const avgPricePerDozen = totalDozens > 0 ? totalRevenue / totalDozens : 0;
+  const totalCratesSold = salesData?.totalCrates || 0;
+  const avgPricePerCrate = totalCratesSold > 0 ? totalRevenue / totalCratesSold : 0;
   const paidTransactions =
     salesData?.rows.filter((row) => row.paymentStatus === "paid").length || 0;
   const pendingTransactions =
@@ -140,9 +138,8 @@ export function buildReportsOverviewData(input: {
       crackedEggs,
       crackedPercent,
       totalRevenue,
-      totalEggsSold,
-      totalDozens,
-      avgPricePerDozen,
+      totalCratesSold,
+      avgPricePerCrate,
       paidTransactions,
       pendingTransactions,
       totalOperatingCosts,

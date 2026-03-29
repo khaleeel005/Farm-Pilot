@@ -40,6 +40,7 @@ import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { PageHeader } from '@/components/shared/page-header';
+import { CsvUploader } from '@/components/shared/csv-uploader';
 import {
   useDailyLogs,
   useDeleteDailyLog,
@@ -47,6 +48,7 @@ import {
   useResourcePermissions,
   useToastContext,
   useUpdateDailyLog,
+  useCreateBulkDailyLogs,
 } from '@/hooks';
 import { calculateDailyLogStats } from '@/lib/dailyLogs';
 import type { DailyLog, DailyLogPayload } from '@/types';
@@ -71,8 +73,10 @@ export function DailyLogs() {
   const [deleteConfirmLog, setDeleteConfirmLog] = useState<DailyLog | null>(null);
   const [editingLog, setEditingLog] = useState<DailyLog | null>(null);
   const [editForm, setEditForm] = useState({ ...EMPTY_DAILY_LOG_FORM });
+  const [showImportCsv, setShowImportCsv] = useState(false);
   const toast = useToastContext();
-  const { canUpdate, canDelete } = useResourcePermissions('DAILY_LOGS');
+  const { canUpdate, canDelete, canCreate } = useResourcePermissions('DAILY_LOGS');
+  const createBulkDailyLogsMutation = useCreateBulkDailyLogs();
   const stats = useMemo(() => calculateDailyLogStats(logs), [logs]);
 
   const handleDateChange = (date: Date | undefined) => {
@@ -146,8 +150,47 @@ export function DailyLogs() {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
+  const handleImportCsv = async (parsedData: any[]) => {
+    try {
+      const payloads: DailyLogPayload[] = parsedData.map((row) => ({
+        logDate: row.Date || row.logDate || format(new Date(), 'yyyy-MM-dd'),
+        houseId: Number(row.HouseId || row.houseId),
+        eggsCollected: Number(row.EggsCollected || row.eggsCollected) || 0,
+        crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
+        feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
+        mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
+        notes: String(row.Notes || row.notes || ""),
+      }));
+
+      const validPayloads = payloads.filter((p) => p.houseId);
+      if (validPayloads.length === 0) {
+        toast.error("No valid logs found. Exepcted columns: HouseId, Date.");
+        return;
+      }
+
+      await createBulkDailyLogsMutation.mutateAsync(validPayloads);
+      setShowImportCsv(false);
+      toast.success(`Successfully imported ${validPayloads.length} logs!`);
+      void refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to import CSV');
+    }
+  };
+
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
+      {canCreate && (
+        <CsvUploader
+          isOpen={showImportCsv}
+          onOpenChange={setShowImportCsv}
+          onDataParsed={handleImportCsv}
+          buttonText="Import CSV"
+          title="Import Daily Logs CSV"
+          description="Upload a CSV with headers: Date, HouseId, EggsCollected, CrackedEggs, FeedBagsUsed, MortalityCount, Notes"
+          isLoading={createBulkDailyLogsMutation.isPending}
+          sampleTemplate={"Date,HouseId,EggsCollected,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,100,2,1.5,0,Everything normal"}
+        />
+      )}
       <Button variant="outline" size="icon" onClick={goToPreviousDay}>
         <ChevronLeft className="h-4 w-4" />
       </Button>

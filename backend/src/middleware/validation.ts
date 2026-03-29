@@ -166,14 +166,15 @@ export const validateCreateSale = [
     .isISO8601()
     .withMessage("saleDate must be a valid date (YYYY-MM-DD)"),
   body("customerId")
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("customerId must be a positive integer"),
   body("quantity")
     .isInt({ min: 0 })
     .withMessage("quantity must be a non-negative integer"),
-  body("pricePerEgg")
+  body("pricePerCrate")
     .isFloat({ min: 0 })
-    .withMessage("pricePerEgg must be a non-negative number"),
+    .withMessage("pricePerCrate must be a non-negative number"),
   body("totalAmount")
     .optional()
     .isFloat({ min: 0 })
@@ -200,17 +201,17 @@ export const validateUpdateSale = [
     .isISO8601()
     .withMessage("saleDate must be a valid date (YYYY-MM-DD)"),
   body("customerId")
-    .optional()
+    .optional({ nullable: true })
     .isInt({ min: 1 })
     .withMessage("customerId must be a positive integer"),
   body("quantity")
     .optional()
     .isInt({ min: 0 })
     .withMessage("quantity must be a non-negative integer"),
-  body("pricePerEgg")
+  body("pricePerCrate")
     .optional()
     .isFloat({ min: 0 })
-    .withMessage("pricePerEgg must be a non-negative number"),
+    .withMessage("pricePerCrate must be a non-negative number"),
   body("totalAmount")
     .optional()
     .isFloat({ min: 0 })

@@ -39,6 +39,8 @@ import {
   useToastContext,
 } from "@/hooks";
 import { PageHeader } from "@/components/shared/page-header";
+import { CsvUploader } from "@/components/shared/csv-uploader";
+import { useCreateBulkDailyLogs } from "@/hooks/useDailyLogs";
 import {
   buildDailyAlerts,
   buildTodaySummary,
@@ -576,6 +578,8 @@ export function DailyEntryForm() {
   const { workers } = useFarmWorkers();
   const createDailyLogMutation = useCreateDailyLog();
   const toast = useToastContext();
+  const [showImportCsv, setShowImportCsv] = useState(false);
+  const createBulkDailyLogsMutation = useCreateBulkDailyLogs();
 
   const todaySummary = useMemo(
     () => buildTodaySummary(todayLogs, houses.length),
@@ -708,12 +712,52 @@ export function DailyEntryForm() {
     }
   };
 
+  const handleImportCsv = async (parsedData: any[]) => {
+    try {
+      const payloads: DailyLogPayload[] = parsedData.map((row) => ({
+        logDate: row.Date || row.logDate || todayIsoDate,
+        houseId: Number(row.HouseId || row.houseId),
+        eggsCollected: Number(row.EggsCollected || row.eggsCollected) || 0,
+        crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
+        feedBagsUsed: Number(row.FeedBagsUsed || row.feedBagsUsed) || 0,
+        mortalityCount: Number(row.MortalityCount || row.mortalityCount) || 0,
+        notes: String(row.Notes || row.notes || ""),
+      }));
+
+      const validPayloads = payloads.filter((p) => p.houseId);
+      if (validPayloads.length === 0) {
+        toast.error("No valid logs found. Exepcted columns: HouseId, Date.");
+        return;
+      }
+
+      await createBulkDailyLogsMutation.mutateAsync(validPayloads);
+      setShowImportCsv(false);
+      toast.success(`Successfully imported ${validPayloads.length} logs!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to import CSV');
+    }
+  };
+
+  const headerActions = (
+    <CsvUploader
+      isOpen={showImportCsv}
+      onOpenChange={setShowImportCsv}
+      onDataParsed={handleImportCsv}
+      buttonText="Import CSV"
+      title="Import Daily Logs CSV"
+      description="Upload a CSV with headers: Date, HouseId, EggsCollected, CrackedEggs, FeedBagsUsed, MortalityCount, Notes"
+      isLoading={createBulkDailyLogsMutation.isPending}
+      sampleTemplate={"Date,HouseId,EggsCollected,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,100,2,1.5,0,Everything normal"}
+    />
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Daily Operations"
         title="Daily Entry"
         description="Record today's production, feed usage, and observations"
+        actions={headerActions}
       />
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">

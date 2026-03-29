@@ -14,7 +14,7 @@ export interface CreateSalePayload {
   customerId?: string;
   customer: string;
   quantity: number;
-  pricePerEgg: number;
+  pricePerCrate: number;
   total: number;
   method: string;
   notes?: string;

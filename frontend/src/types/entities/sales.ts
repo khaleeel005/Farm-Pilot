@@ -18,9 +18,9 @@ export interface Customer {
 export interface Sale {
   id: number;
   saleDate: string;
-  customerId: number;
+  customerId?: number | null;
   quantity: number;
-  pricePerEgg: number;
+  pricePerCrate: number;
   totalAmount: number;
   paymentMethod: 'cash' | 'transfer' | 'check';
   paymentStatus: 'paid' | 'pending';
@@ -47,9 +47,9 @@ export interface CustomerPayload {
  */
 export interface SalePayload {
   saleDate: string;
-  customerId: number;
+  customerId?: number | null;
   quantity: number;
-  pricePerEgg: number;
+  pricePerCrate: number;
   totalAmount: number;
   paymentMethod?: 'cash' | 'transfer' | 'check';
   paymentStatus?: 'paid' | 'pending';

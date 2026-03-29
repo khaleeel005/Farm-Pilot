@@ -8,6 +8,7 @@ import {
 import {
   createCustomer,
   createSale,
+  createBulkSales,
   getCustomers,
   getSales,
 } from "@/lib/api";
@@ -33,6 +34,7 @@ export interface UseSalesReturn {
   error: Error | null;
   refresh: () => Promise<void>;
   createSale: (payload: SalePayload) => Promise<Sale>;
+  createBulkSales: (payloads: SalePayload[]) => Promise<Sale[]>;
   createCustomer: (payload: CustomerPayload) => Promise<Customer>;
   summary: SalesSummary;
   isCreatingSale: boolean;
@@ -93,6 +95,13 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
     },
   });
 
+  const createBulkSalesMutation = useMutation({
+    mutationFn: createBulkSales,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+    },
+  });
+
   const createCustomerMutation = useMutation({
     mutationFn: createCustomer,
     onSuccess: async () => {
@@ -113,6 +122,7 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
     salesQuery.error ||
     customersQuery.error ||
     createSaleMutation.error ||
+    createBulkSalesMutation.error ||
     createCustomerMutation.error ||
     null;
 
@@ -129,12 +139,13 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
       await Promise.all([salesQuery.refetch(), customersQuery.refetch()]);
     },
     createSale: (payload) => createSaleMutation.mutateAsync(payload),
+    createBulkSales: (payloads) => createBulkSalesMutation.mutateAsync(payloads),
     createCustomer: (payload) => createCustomerMutation.mutateAsync(payload),
     summary,
-    isCreatingSale: createSaleMutation.isPending,
+    isCreatingSale: createSaleMutation.isPending || createBulkSalesMutation.isPending,
     isCreatingCustomer: createCustomerMutation.isPending,
     isMutating:
-      createSaleMutation.isPending || createCustomerMutation.isPending,
+      createSaleMutation.isPending || createBulkSalesMutation.isPending || createCustomerMutation.isPending,
   };
 }
 

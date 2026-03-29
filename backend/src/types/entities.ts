@@ -95,9 +95,9 @@ export interface CustomerEntity {
 export interface SalesEntity {
   id: number;
   saleDate: DateString;
-  customerId: number;
+  customerId?: number | null;
   quantity: number;
-  pricePerEgg: Numeric;
+  pricePerCrate: Numeric;
   totalAmount: Numeric;
   paymentMethod: "cash" | "transfer" | "check";
   paymentStatus: "paid" | "pending";

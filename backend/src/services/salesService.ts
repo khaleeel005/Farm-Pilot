@@ -2,12 +2,13 @@ import Sales from "../models/Sales.js";
 import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
 import type { SalesEntity } from "../types/entities.js";
 import type { SalesFiltersInput, SalesUpdateInput } from "../types/dto.js";
+import { sequelize } from "../utils/database.js";
 
 const SALES_MUTABLE_FIELDS = [
   "saleDate",
   "customerId",
   "quantity",
-  "pricePerEgg",
+  "pricePerCrate",
   "totalAmount",
   "paymentMethod",
   "paymentStatus",
@@ -34,15 +35,15 @@ const salesService = {
     const payload = pickSalesPayload(data);
 
     // Ensure required fields
-    if (!payload.saleDate || !payload.customerId) {
-      throw new BadRequestError("saleDate and customerId are required");
+    if (!payload.saleDate) {
+      throw new BadRequestError("saleDate is required");
     }
 
-    // Compute totalAmount from quantity * pricePerEgg if not provided
+    // Compute totalAmount from quantity * pricePerCrate if not provided
     if (payload.totalAmount === undefined || payload.totalAmount === null) {
       const quantity = Number(payload.quantity || 0);
-      const pricePerEgg = Number(payload.pricePerEgg || 0);
-      const computed = quantity * pricePerEgg;
+      const pricePerCrate = Number(payload.pricePerCrate || 0);
+      const computed = quantity * pricePerCrate;
 
       // If computed is 0 and no explicit totalAmount provided, allow zero sales
       payload.totalAmount = Number.isFinite(computed) ? computed : 0;
@@ -50,6 +51,31 @@ const salesService = {
 
     const sale = await Sales.create(payload);
     return sale;
+  },
+
+  createSalesBulk: async (dataArray: Partial<SalesEntity>[]) => {
+    if (!dataArray || !Array.isArray(dataArray) || dataArray.length === 0) {
+      throw new BadRequestError("An array of sales records is required");
+    }
+
+    const payloads = dataArray.map((data) => {
+      const payload = pickSalesPayload(data);
+      if (!payload.saleDate) {
+        throw new BadRequestError("saleDate is required for all records");
+      }
+      
+      if (payload.totalAmount === undefined || payload.totalAmount === null) {
+        const quantity = Number(payload.quantity || 0);
+        const pricePerCrate = Number(payload.pricePerCrate || 0);
+        const computed = quantity * pricePerCrate;
+        payload.totalAmount = Number.isFinite(computed) ? computed : 0;
+      }
+      return payload;
+    });
+
+    return sequelize.transaction(async (transaction) => {
+      return Sales.bulkCreate(payloads, { transaction, validate: true });
+    });
   },
 
   getAllSales: async (filters: SalesFiltersInput = {}) => {
@@ -93,12 +119,12 @@ const salesService = {
     if (!existing) throw new NotFoundError("Sale not found");
 
     if (
-      (payload.quantity !== undefined || payload.pricePerEgg !== undefined) &&
+      (payload.quantity !== undefined || payload.pricePerCrate !== undefined) &&
       (payload.totalAmount === undefined || payload.totalAmount === null)
     ) {
       const quantity = Number(payload.quantity ?? existing.getDataValue("quantity") ?? 0);
-      const pricePerEgg = Number(payload.pricePerEgg ?? existing.getDataValue("pricePerEgg") ?? 0);
-      const computed = quantity * pricePerEgg;
+      const pricePerCrate = Number(payload.pricePerCrate ?? existing.getDataValue("pricePerCrate") ?? 0);
+      const computed = quantity * pricePerCrate;
       payload.totalAmount = Number.isFinite(computed) ? computed : 0;
     }
 

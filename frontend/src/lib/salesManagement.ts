@@ -9,7 +9,7 @@ export interface SaleFormData {
   customerId: string;
   saleDate: string;
   quantity: string;
-  pricePerEgg: string;
+  pricePerCrate: string;
   paymentMethod: string;
   paymentStatus: "paid" | "pending";
 }
@@ -25,7 +25,7 @@ export interface CustomerFormData {
 export interface SalesOverviewMetrics {
   todayRevenue: number;
   todaySalesCount: number;
-  todayEggs: number;
+  todayCrates: number;
   pendingPayments: number;
   pendingCount: number;
   totalCustomers: number;
@@ -40,7 +40,7 @@ export function createEmptySaleForm(): SaleFormData {
     customerId: "",
     saleDate: getTodayDateValue(),
     quantity: "",
-    pricePerEgg: "",
+    pricePerCrate: "",
     paymentMethod: "",
     paymentStatus: "pending",
   };
@@ -58,16 +58,16 @@ export function createEmptyCustomerForm(): CustomerFormData {
 
 export function calculateSaleFormTotal(formData: SaleFormData) {
   const quantity = Number.parseFloat(formData.quantity) || 0;
-  const pricePerEgg = Number.parseFloat(formData.pricePerEgg) || 0;
-  return quantity * pricePerEgg;
+  const pricePerCrate = Number.parseFloat(formData.pricePerCrate) || 0;
+  return quantity * pricePerCrate;
 }
 
 export function buildSalePayload(formData: SaleFormData): SalePayload {
   return {
-    customerId: Number.parseInt(formData.customerId, 10),
+    customerId: formData.customerId ? Number.parseInt(formData.customerId, 10) : undefined,
     saleDate: formData.saleDate,
     quantity: Number.parseFloat(formData.quantity) || 0,
-    pricePerEgg: Number.parseFloat(formData.pricePerEgg) || 0,
+    pricePerCrate: Number.parseFloat(formData.pricePerCrate) || 0,
     totalAmount: calculateSaleFormTotal(formData),
     paymentStatus: formData.paymentStatus,
     paymentMethod:
@@ -104,7 +104,7 @@ export function calculateSalesOverview(
       0,
     ),
     todaySalesCount: todaySales.length,
-    todayEggs: todaySales.reduce(
+    todayCrates: todaySales.reduce(
       (sum, sale) => sum + (Number(sale.quantity) || 0),
       0,
     ),
