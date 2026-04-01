@@ -70,6 +70,9 @@ Start the production server:
 pnpm start
 ```
 
+On startup, production now applies pending Sequelize migrations automatically by default.
+Set `SKIP_DB_MIGRATIONS=true` only if your deployment pipeline runs them separately.
+
 ## Render Deployment
 
 This repo includes `../render.yaml` for Render Blueprint deployment.

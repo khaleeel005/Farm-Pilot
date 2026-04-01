@@ -2,7 +2,9 @@ import "../config/loadEnv.js";
 import { Sequelize, type Dialect } from "sequelize";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import logger from "../config/logger.js";
+import { shouldRunCliMigrations } from "./migrationPolicy.js";
 
 // Ensure pg package is available
 try {
@@ -98,6 +100,8 @@ function readDatabaseEnv(): DatabaseEnv {
 }
 
 const env = readDatabaseEnv();
+const currentFilePath = fileURLToPath(import.meta.url);
+const backendRoot = path.resolve(path.dirname(currentFilePath), "..", "..");
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -249,7 +253,7 @@ export function close() {
 
 export function initModels(
   modelsDir = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(currentFilePath),
     "..",
     "models",
   ),
@@ -268,6 +272,17 @@ export function initModels(
 
 // Track if auto-migration has run (for test environment)
 let migrationComplete = false;
+
+async function runCliMigrations() {
+  const { execSync } = await import("child_process");
+
+  logger.info("Running migrations via sequelize-cli...");
+  execSync("npx sequelize-cli db:migrate", {
+    cwd: backendRoot,
+    stdio: "inherit",
+  });
+  logger.info("✓ Migrations completed successfully.");
+}
 
 export async function autoMigrate() {
   const isTestEnv = process.env.NODE_ENV === "test";
@@ -291,24 +306,9 @@ export async function autoMigrate() {
     await import("../models/associations.js");
     logger.debug("✓ Model associations loaded.");
 
-    const isProduction = process.env.NODE_ENV === "production";
-
-    // In production, assume migrations are run externally (e.g., via CI/CD)
-    // Just verify the database is accessible
-    if (isProduction) {
-      logger.info(
-        "Production mode: skipping migrations (assumed to be run externally)",
-      );
-      migrationComplete = true;
-      return;
-    }
-
-    if (process.env.USE_MIGRATIONS === "true") {
+    if (shouldRunCliMigrations()) {
       try {
-        const { execSync } = await import("child_process");
-        logger.info("Running migrations via sequelize-cli...");
-        execSync("npx sequelize-cli db:migrate", { stdio: "inherit" });
-        logger.info("✓ Migrations completed successfully.");
+        await runCliMigrations();
         migrationComplete = true;
         return;
       } catch (mErr: unknown) {
@@ -319,6 +319,12 @@ export async function autoMigrate() {
         });
         logger.info("Falling back to sequelize.sync...");
       }
+    } else if (process.env.NODE_ENV === "production") {
+      logger.info(
+        "Production mode: CLI migrations disabled via SKIP_DB_MIGRATIONS=true. Verifying schema without applying migrations.",
+      );
+      migrationComplete = true;
+      return;
     }
 
     // For tests with SQLite, use force: true to avoid index duplication issues
