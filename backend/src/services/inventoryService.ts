@@ -29,7 +29,7 @@ export interface EggInventorySummary {
   totalSoldEggs: number; // crates × 30
   totalSoldCrates: number;
   totalAdjustments: number;
-  netStock: number; // opening + collected - cracked - soldEggs + adjustments
+  netStock: number; // opening + collected - soldEggs + adjustments
   netStockCrates: number;
   netStockPieces: number;
   dailyFlow: DailyFlowRow[];
@@ -70,11 +70,10 @@ const inventoryService = {
     );
 
     const pastCollected = pastLogs.reduce((s, l) => s + (Number(l.eggsCollected) || 0), 0);
-    const pastCracked = pastLogs.reduce((s, l) => s + (Number(l.crackedEggs) || 0), 0);
     const pastSold = pastSales.reduce((s, r) => s + (Number(r.quantity) || 0), 0) * EGGS_PER_CRATE;
     const pastAdjTotal = pastAdjustments.reduce((s, a) => s + (Number(a.quantity) || 0), 0);
-    
-    const openingBalance = pastCollected - pastCracked - pastSold + pastAdjTotal;
+
+    const openingBalance = pastCollected - pastSold + pastAdjTotal;
 
     // ----------------------------------------------------------------------
     // 2. Compute Daily Flow within the requested window
@@ -140,7 +139,7 @@ const inventoryService = {
       const adjustment = adjustmentsByDate.get(date) ?? { quantity: 0 };
       const soldEggs = sale.crates * EGGS_PER_CRATE;
       
-      const net = log.collected - log.cracked - soldEggs + adjustment.quantity;
+      const net = log.collected - soldEggs + adjustment.quantity;
       return {
         date,
         collected: log.collected,
@@ -160,7 +159,8 @@ const inventoryService = {
     const totalAdjustments = dailyFlow.reduce((s, r) => s + r.adjusted, 0);
     
     // Net stock at the very end (Opening + Period Net Flow)
-    const netStock = openingBalance + totalCollected - totalCracked - totalSoldEggs + totalAdjustments;
+    const netStock =
+      openingBalance + totalCollected - totalSoldEggs + totalAdjustments;
     const netStockCrates = Math.floor(netStock / EGGS_PER_CRATE);
     const netStockPieces = netStock % EGGS_PER_CRATE;
 

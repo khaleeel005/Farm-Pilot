@@ -66,6 +66,7 @@ const EMPTY_METRICS: ReportsMetrics = {
   pendingTransactions: 0,
   totalOperatingCosts: 0,
   totalCostEntries: 0,
+  totalFeedCost: 0,
   totalExpenses: 0,
   netProfit: 0,
   profitMargin: 0,
@@ -538,6 +539,7 @@ function FinancialTabContent({
   financialData,
 }: FinancialTabContentProps) {
   const costEntriesByType = financialData?.costEntriesByType || {};
+  const feedCostByBatch = financialData?.feedCostByBatch || {};
   const expenseTypeLabels: Record<string, string> = {
     feed: "Feed",
     medication: "Medication",
@@ -551,10 +553,16 @@ function FinancialTabContent({
     consulting: "Consulting",
     other: "Other",
   };
+  const getCostSharePercent = (amount: number, total: number) => {
+    if (total <= 0) {
+      return "0.0";
+    }
+    return ((amount / total) * 100).toFixed(1);
+  };
 
   return (
     <TabsContent value="financial" className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -594,6 +602,22 @@ function FinancialTabContent({
             </div>
             <p className="text-xs text-muted-foreground">
               {Object.keys(costEntriesByType).length} expense types
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Feed Consumption
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold text-destructive truncate">
+              ₦{metrics.totalFeedCost.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {Object.keys(feedCostByBatch).length} feed batches
             </p>
           </CardContent>
         </Card>
@@ -641,9 +665,18 @@ function FinancialTabContent({
               </div>
 
               <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
-                <span className="font-medium text-sm">Variable Expenses</span>
+                <span className="font-medium text-sm">
+                  Variable Expenses (Entries)
+                </span>
                 <span className="text-base sm:text-lg font-bold text-destructive">
                   ₦{metrics.totalCostEntries.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">Feed Consumption</span>
+                <span className="text-base sm:text-lg font-bold text-destructive">
+                  ₦{metrics.totalFeedCost.toLocaleString()}
                 </span>
               </div>
 
@@ -690,42 +723,78 @@ function FinancialTabContent({
             <CardTitle className="display-heading text-2xl">
               Expense Breakdown
             </CardTitle>
-            <CardDescription>Variable costs by type</CardDescription>
+            <CardDescription>Variable and feed-related costs</CardDescription>
           </CardHeader>
-          <CardContent>
-            {Object.keys(costEntriesByType).length > 0 ? (
-              <div className="space-y-3">
-                {Object.entries(costEntriesByType)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([type, amount]) => (
-                    <div
-                      key={type}
-                      className="flex items-center justify-between rounded-lg border border-border/70 p-3"
-                    >
-                      <div className="space-y-0.5">
-                        <p className="font-medium text-sm capitalize">
-                          {expenseTypeLabels[type] || type}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {((amount / metrics.totalCostEntries) * 100).toFixed(
-                            1,
-                          )}
-                          % of expenses
-                        </p>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Variable Expense Types
+              </p>
+              {Object.keys(costEntriesByType).length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(costEntriesByType)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([type, amount]) => (
+                      <div
+                        key={type}
+                        className="flex items-center justify-between rounded-lg border border-border/70 p-3"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-sm capitalize">
+                            {expenseTypeLabels[type] || type}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {getCostSharePercent(amount, metrics.totalCostEntries)}% of
+                            variable expenses
+                          </p>
+                        </div>
+                        <span className="text-base font-bold text-destructive">
+                          ₦{amount.toLocaleString()}
+                        </span>
                       </div>
-                      <span className="text-base font-bold text-destructive">
-                        ₦{amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <EmptyState
-                variant="reports"
-                title="No variable expenses"
-                description="No cost entries found for the selected period."
-              />
-            )}
+                    ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
+                  No cost entries found for the selected period.
+                </p>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Feed Cost by Batch
+              </p>
+              {Object.keys(feedCostByBatch).length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(feedCostByBatch)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([batchName, amount]) => (
+                      <div
+                        key={batchName}
+                        className="flex items-center justify-between rounded-lg border border-border/70 p-3"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-sm">{batchName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {getCostSharePercent(amount, metrics.totalFeedCost)}% of
+                            feed costs
+                          </p>
+                        </div>
+                        <span className="text-base font-bold text-destructive">
+                          ₦{amount.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
+                  No feed consumption costs found for the selected period.
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

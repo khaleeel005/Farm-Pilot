@@ -41,6 +41,7 @@ export interface ReportsMetrics {
   pendingTransactions: number;
   totalOperatingCosts: number;
   totalCostEntries: number;
+  totalFeedCost: number;
   totalExpenses: number;
   netProfit: number;
   profitMargin: number;
@@ -130,8 +131,10 @@ export function buildReportsOverviewData(input: {
 
   const totalOperatingCosts = financialData?.totalOperating || 0;
   const totalCostEntries = financialData?.totalCostEntries || 0;
+  const totalFeedCost = financialData?.totalFeedCost || 0;
   const totalExpenses =
-    financialData?.totalExpenses ?? totalOperatingCosts + totalCostEntries;
+    financialData?.totalExpenses ??
+    totalOperatingCosts + totalCostEntries + totalFeedCost;
   // Use consistent totalSales from financial data if available, fallback to totalRevenue from sales
   const consistentRevenue = financialData?.totalSales ?? totalRevenue;
   const netProfit = consistentRevenue - totalExpenses;
@@ -163,6 +166,7 @@ export function buildReportsOverviewData(input: {
       pendingTransactions,
       totalOperatingCosts,
       totalCostEntries,
+      totalFeedCost,
       totalExpenses,
       netProfit,
       profitMargin,

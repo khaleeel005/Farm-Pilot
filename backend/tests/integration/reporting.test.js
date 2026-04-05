@@ -167,6 +167,29 @@ describe("Reporting Flow", () => {
     expect(res.body.data).toHaveProperty("start", "2025-08-01");
     expect(res.body.data).toHaveProperty("end", "2025-08-31");
     expect(res.body.data).toHaveProperty("totalOperating");
+    expect(res.body.data).toHaveProperty("totalCostEntries");
+    expect(res.body.data).toHaveProperty("totalFeedCost");
+    expect(Number(res.body.data.totalFeedCost)).toBeGreaterThan(0);
+    expect(res.body.data).toHaveProperty("feedCostByBatch");
+    expect(res.body.data.feedCostByBatch).toHaveProperty("Reports Test Batch");
+
+    const feedBreakdownTotal = Object.values(res.body.data.feedCostByBatch).reduce(
+      (sum, amount) => sum + (Number(amount) || 0),
+      0
+    );
+    expect(feedBreakdownTotal).toBeCloseTo(
+      Number(res.body.data.totalFeedCost) || 0,
+      5
+    );
+
+    const recomputedExpenses =
+      (Number(res.body.data.totalOperating) || 0) +
+      (Number(res.body.data.totalCostEntries) || 0) +
+      (Number(res.body.data.totalFeedCost) || 0);
+    expect(Number(res.body.data.totalExpenses) || 0).toBeCloseTo(
+      recomputedExpenses,
+      5
+    );
     expect(res.body.data).toHaveProperty("totalSales");
   });
 

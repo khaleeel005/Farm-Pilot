@@ -2,6 +2,7 @@ import DailyLog from "../models/DailyLog.js";
 import Sales from "../models/Sales.js";
 import OperatingCost from "../models/OperatingCost.js";
 import CostEntry from "../models/CostEntry.js";
+import FeedBatch from "../models/FeedBatch.js";
 import { Op } from "sequelize";
 import type { Model } from "sequelize";
 import { Parser as CsvParser } from "json2csv";
@@ -12,6 +13,7 @@ import type {
   OperatingCostEntity,
   SalesEntity,
   CostEntryEntity,
+  FeedBatchEntity,
 } from "../types/entities.js";
 import type { ReportType } from "../types/dto.js";
 import { BadRequestError, InternalServerError } from "../utils/exceptions.js";
@@ -118,20 +120,63 @@ const reportService = {
       {},
     );
 
-    // Total expenses = operating costs + individual cost entries
-    const totalExpenses = totalOperating + totalCostEntries;
+    // Feed costs: calculate from actual daily log consumption (bags used × batch costPerBag)
+    // Only count logs that have a feedBatchId and feedBagsUsed > 0
+    const logs = toPlainRows<DailyLogEntity>(
+      await DailyLog.findAll({
+        where: {
+          logDate: { [Op.between]: [start, end] },
+          feedBatchId: { [Op.ne]: null },
+          feedBagsUsed: { [Op.gt]: 0 },
+        },
+      }),
+    );
+
+    // Group bags used by batch ID
+    const bagsByBatch = logs.reduce<Record<number, number>>((acc, log) => {
+      const batchId = log.feedBatchId!;
+      acc[batchId] = (acc[batchId] || 0) + (Number(log.feedBagsUsed) || 0);
+      return acc;
+    }, {});
+
+    // Fetch the batches and calculate feed cost
+    const batchIds = Object.keys(bagsByBatch).map(Number);
+    let totalFeedCost = 0;
+    const feedCostByBatch: Record<string, number> = {};
+
+    if (batchIds.length > 0) {
+      const batches = toPlainRows<FeedBatchEntity>(
+        await FeedBatch.findAll({
+          where: { id: { [Op.in]: batchIds } },
+        }),
+      );
+
+      for (const batch of batches) {
+        const bagsUsed = bagsByBatch[batch.id] || 0;
+        const costPerBag = Number(batch.costPerBag) || 0;
+        const batchCost = bagsUsed * costPerBag;
+        totalFeedCost += batchCost;
+        feedCostByBatch[batch.batchName || `Batch #${batch.id}`] =
+          Math.round(batchCost);
+      }
+    }
+
+    // Total expenses = operating costs + cost entries + feed costs
+    const totalExpenses = totalOperating + totalCostEntries + totalFeedCost;
 
     return {
       start,
       end,
       totalOperating,
       totalCostEntries,
+      totalFeedCost: Math.round(totalFeedCost),
       totalExpenses,
       totalSales,
       ops,
       sales,
       costEntries,
       costEntriesByType,
+      feedCostByBatch,
     };
   },
 
@@ -177,7 +222,15 @@ const reportService = {
         category: c.category,
         vendor: c.vendor || "",
       }));
-      data = [...opsData, ...entriesData];
+      // Export feed batch costs
+      const feedData = Object.entries(r.feedCostByBatch).map(
+        ([batchName, cost]) => ({
+          type: "feed_cost",
+          batchName,
+          amount: cost,
+        }),
+      );
+      data = [...opsData, ...entriesData, ...feedData];
     } else {
       throw new BadRequestError("unsupported export type");
     }
@@ -237,7 +290,16 @@ const reportService = {
         amount: c.amount,
         details: c.description || "",
       }));
-      rows = [...opsRows, ...entryRows];
+      // Feed costs
+      const feedRows = Object.entries(r.feedCostByBatch).map(
+        ([batchName, cost]) => ({
+          type: "Feed",
+          period: batchName,
+          amount: cost,
+          details: "Feed consumption",
+        }),
+      );
+      rows = [...opsRows, ...entryRows, ...feedRows];
     } else {
       throw new BadRequestError("unsupported export type");
     }

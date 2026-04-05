@@ -243,7 +243,7 @@ export function InventoryDashboard() {
         <SummaryCard
           title="Total Cracked"
           value={`${inventory?.totalCracked ?? 0} pieces`}
-          description="Damaged or lost"
+          description="Tracked only (does not reduce stock)"
           icon={Egg}
         />
         <SummaryCard
@@ -312,7 +312,7 @@ export function InventoryDashboard() {
                           -{day.soldEggs}
                         </TableCell>
                         <TableCell className="text-right text-red-600">
-                          {day.cracked > 0 ? `-${day.cracked}` : '0'}
+                          {day.cracked > 0 ? `${day.cracked}` : '0'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {day.adjusted !== 0 ? (day.adjusted > 0 ? `+${formatPieces(day.adjusted)}` : formatPieces(day.adjusted)) : '-'}

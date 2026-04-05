@@ -41,6 +41,7 @@ export interface FinancialReportData {
   end: string;
   totalOperating: number;
   totalCostEntries: number;
+  totalFeedCost: number;
   totalExpenses: number;
   totalSales: number;
   ops: Array<{
@@ -61,6 +62,7 @@ export interface FinancialReportData {
     vendor?: string;
   }>;
   costEntriesByType: Record<string, number>;
+  feedCostByBatch: Record<string, number>;
 }
 
 export interface DashboardSummary {
@@ -146,12 +148,14 @@ export async function getFinancialReport(
       end: endDate,
       totalOperating: 0,
       totalCostEntries: 0,
+      totalFeedCost: 0,
       totalExpenses: 0,
       totalSales: 0,
       ops: [],
       sales: [],
       costEntries: [],
       costEntriesByType: {},
+      feedCostByBatch: {},
     }
   );
 }
