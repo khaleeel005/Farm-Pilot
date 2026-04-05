@@ -80,7 +80,6 @@ interface ProductionEntryCardProps {
   isFeedBagUsageValid: boolean;
   isFormValid: boolean;
   isSubmitting: boolean;
-  onEntryDateChange: (value: string) => void;
   onFeedBagsChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onFormDataChange: (updates: Partial<DailyLogFormValues>) => void;
   onHouseChange: (value: string) => void;
@@ -408,7 +407,6 @@ function ProductionEntryCard({
   isFeedBagUsageValid,
   isFormValid,
   isSubmitting,
-  onEntryDateChange,
   onFeedBagsChange,
   onFormDataChange,
   onHouseChange,
@@ -428,20 +426,6 @@ function ProductionEntryCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={onSubmit} className="space-y-5">
-          <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
-            <Label htmlFor="log-date">Log Date</Label>
-            <Input
-              id="log-date"
-              type="date"
-              value={entryDate}
-              onChange={(event) =>
-                onEntryDateChange(event.target.value || getTodayIsoDate())
-              }
-            />
-          </div>
-
-          <Separator className="opacity-60" />
-
           <HouseSelectionSection
             houses={houses}
             housesLoading={housesLoading}
@@ -836,16 +820,35 @@ export function DailyEntryForm() {
   };
 
   const headerActions = (
-    <CsvUploader
-      isOpen={showImportCsv}
-      onOpenChange={setShowImportCsv}
-      onDataParsed={handleImportCsv}
-      buttonText="Import CSV"
-      title="Import Daily Logs CSV"
-      description={`Upload a CSV with headers: Date, HouseId, EggCrates, EggPieces, CrackedEggs, FeedBagsUsed, MortalityCount, Notes. (${eggsPerCrate} eggs per crate)`}
-      isLoading={createBulkDailyLogsMutation.isPending}
-      sampleTemplate={`Date,HouseId,EggCrates,EggPieces,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,4,10,2,1.5,0,Everything normal`}
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        id="daily-entry-date"
+        type="date"
+        value={selectedLogDate}
+        onChange={(event) =>
+          setSelectedLogDate(event.target.value || getTodayIsoDate())
+        }
+        className="h-9 w-[170px]"
+        aria-label="Daily entry date"
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setSelectedLogDate(getTodayIsoDate())}
+      >
+        Today
+      </Button>
+      <CsvUploader
+        isOpen={showImportCsv}
+        onOpenChange={setShowImportCsv}
+        onDataParsed={handleImportCsv}
+        buttonText="Import CSV"
+        title="Import Daily Logs CSV"
+        description={`Upload a CSV with headers: Date, HouseId, EggCrates, EggPieces, CrackedEggs, FeedBagsUsed, MortalityCount, Notes. (${eggsPerCrate} eggs per crate)`}
+        isLoading={createBulkDailyLogsMutation.isPending}
+        sampleTemplate={`Date,HouseId,EggCrates,EggPieces,CrackedEggs,FeedBagsUsed,MortalityCount,Notes\n2026-03-20,1,4,10,2,1.5,0,Everything normal`}
+      />
+    </div>
   );
 
   return (
@@ -872,7 +875,6 @@ export function DailyEntryForm() {
             isFeedBagUsageValid={isFeedBagUsageValid}
             isFormValid={isFormValid}
             isSubmitting={createDailyLogMutation.isPending}
-            onEntryDateChange={setSelectedLogDate}
             onFeedBagsChange={handleFeedBagsChange}
             onFormDataChange={updateFormData}
             onHouseChange={setSelectedHouse}
