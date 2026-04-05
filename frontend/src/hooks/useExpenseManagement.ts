@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { createCostEntry, getCostEntries, getCostTypes } from "@/lib/api";
+import {
+  createCostEntry,
+  getCostEntries,
+  getCostTypes,
+  updateCostEntry,
+} from "@/lib/api";
 import {
   buildExpenseExportCsv,
   calculateExpenseMetrics,
@@ -21,6 +26,10 @@ export interface UseExpenseManagementReturn {
   expenseMetrics: ReturnType<typeof calculateExpenseMetrics>;
   expenses: ReturnType<typeof mapExpenseEntry>[];
   handleCreateCostEntry: () => Promise<void>;
+  handleUpdateCostEntry: (
+    id: number,
+    payload: Partial<CostEntry>,
+  ) => Promise<boolean>;
   handleExport: () => void;
   initialLoading: boolean;
   isAddExpenseOpen: boolean;
@@ -105,6 +114,31 @@ export function useExpenseManagement(): UseExpenseManagementReturn {
     }
   }, [loadCostData, newCostEntry, resetNewCostEntry, toast]);
 
+  const handleUpdateCostEntry = useCallback(
+    async (id: number, payload: Partial<CostEntry>) => {
+      try {
+        setLoading(true);
+        const result = await updateCostEntry(id, payload);
+
+        if (!result) {
+          toast.error("Failed to update cost entry.");
+          return false;
+        }
+
+        await loadCostData();
+        toast.success("Cost entry updated successfully.");
+        return true;
+      } catch (error) {
+        console.error("Failed to update cost entry:", error);
+        toast.error("Failed to update cost entry.");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadCostData, toast],
+  );
+
   const filteredExpenses = useMemo(
     () => filterExpenseEntries(costEntries, categoryFilter, searchTerm),
     [categoryFilter, costEntries, searchTerm],
@@ -163,6 +197,7 @@ export function useExpenseManagement(): UseExpenseManagementReturn {
     newCostEntry,
     updateNewCostEntry,
     handleCreateCostEntry,
+    handleUpdateCostEntry,
     handleExport,
     currentMonthRange,
     expenses,

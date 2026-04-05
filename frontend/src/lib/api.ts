@@ -74,9 +74,11 @@ export {
   updateFeedRecipe,
 } from "@/lib/feedApi";
 export {
+  createBirdCost,
   createCostEntry,
   createOperatingCost,
   deleteCostEntry,
+  getBirdCosts,
   getAverageMonthlyProduction,
   getCostEntries,
   getCostEntriesSummary,
@@ -86,5 +88,6 @@ export {
   getDailyCalculation,
   getDailyCosts,
   getEggPriceEstimate,
+  getHealthCostPerEgg,
   updateCostEntry,
 } from "@/lib/costsApi";

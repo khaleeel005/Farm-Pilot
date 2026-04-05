@@ -10,20 +10,28 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   TrendingUp,
   TrendingDown,
   Calculator,
   Target,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { useCostAnalysisOverview } from "@/hooks";
 import { getCostBreakdownItems } from "@/lib/costAnalysis";
+import { createBirdCost, getBirdCosts } from "@/lib/api";
+import { useResourcePermissions, useToastContext } from "@/hooks";
+import { useState, useEffect } from "react";
 
 const emptyCostBreakdown = {
+  birdCost: 0,
   feedCost: 0,
   laborCost: 0,
   fixedCosts: 0,
@@ -48,6 +56,100 @@ const emptyMonthlyProjection = {
 
 export function CostAnalysis() {
   const { data, isPending, error, refetch } = useCostAnalysisOverview();
+  const toast = useToastContext();
+  const { canCreate: canCreateBirdCost } = useResourcePermissions("COSTS");
+  const [birdCosts, setBirdCosts] = useState<Array<Record<string, unknown>>>([]);
+  const [birdCostsLoading, setBirdCostsLoading] = useState(false);
+  const [submittingBirdCost, setSubmittingBirdCost] = useState(false);
+  const [birdCostForm, setBirdCostForm] = useState({
+    batchDate: new Date().toLocaleDateString("en-CA"),
+    birdsPurchased: "",
+    costPerBird: "",
+    vaccinationCostPerBird: "0",
+    expectedLayingMonths: "12",
+  });
+
+  const loadBirdCosts = async () => {
+    try {
+      setBirdCostsLoading(true);
+      const rows = await getBirdCosts();
+      setBirdCosts(rows as unknown as Array<Record<string, unknown>>);
+    } catch {
+      setBirdCosts([]);
+    } finally {
+      setBirdCostsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBirdCosts();
+  }, []);
+
+  const handleAddBirdCost = async () => {
+    try {
+      const birdsPurchased = Number.parseInt(birdCostForm.birdsPurchased, 10);
+      const costPerBird = Number.parseFloat(birdCostForm.costPerBird);
+      const vaccinationCostPerBird = Number.parseFloat(
+        birdCostForm.vaccinationCostPerBird,
+      );
+      const expectedLayingMonths = Number.parseInt(
+        birdCostForm.expectedLayingMonths,
+        10,
+      );
+
+      if (!birdCostForm.batchDate) {
+        toast.error("Bird batch date is required.");
+        return;
+      }
+      if (!Number.isInteger(birdsPurchased) || birdsPurchased <= 0) {
+        toast.error("Birds purchased must be a positive integer.");
+        return;
+      }
+      if (!Number.isFinite(costPerBird) || costPerBird < 0) {
+        toast.error("Cost per bird must be a non-negative number.");
+        return;
+      }
+      if (
+        !Number.isFinite(vaccinationCostPerBird) ||
+        vaccinationCostPerBird < 0
+      ) {
+        toast.error("Vaccination cost per bird must be non-negative.");
+        return;
+      }
+      if (!Number.isInteger(expectedLayingMonths) || expectedLayingMonths <= 0) {
+        toast.error("Expected laying months must be a positive integer.");
+        return;
+      }
+
+      setSubmittingBirdCost(true);
+      await createBirdCost({
+        batchDate: birdCostForm.batchDate,
+        birdsPurchased,
+        costPerBird,
+        vaccinationCostPerBird,
+        expectedLayingMonths,
+      });
+
+      toast.success("Bird cost added successfully.");
+      setBirdCostForm((prev) => ({
+        ...prev,
+        birdsPurchased: "",
+        costPerBird: "",
+        vaccinationCostPerBird: "0",
+        expectedLayingMonths: "12",
+      }));
+      await Promise.all([loadBirdCosts(), refetch()]);
+    } catch (createError) {
+      console.error("Failed to create bird cost:", createError);
+      toast.error(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to add bird cost.",
+      );
+    } finally {
+      setSubmittingBirdCost(false);
+    }
+  };
   const costBreakdown = data?.costBreakdown ?? emptyCostBreakdown;
   const pricingRecommendation =
     data?.pricingRecommendation ?? emptyPricingRecommendation;
@@ -382,6 +484,149 @@ export function CostAnalysis() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="display-heading text-2xl">
+            Bird Cost Setup
+          </CardTitle>
+          <CardDescription>
+            Optional: add bird acquisition and vaccination costs for pricing
+            calculations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {canCreateBirdCost ? (
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-border/70 bg-muted/35 p-3 md:grid-cols-5">
+              <div className="space-y-1">
+                <Label htmlFor="bird-batch-date">Batch Date</Label>
+                <Input
+                  id="bird-batch-date"
+                  type="date"
+                  value={birdCostForm.batchDate}
+                  onChange={(event) =>
+                    setBirdCostForm((prev) => ({
+                      ...prev,
+                      batchDate: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="birds-purchased">Birds</Label>
+                <Input
+                  id="birds-purchased"
+                  type="number"
+                  min="1"
+                  value={birdCostForm.birdsPurchased}
+                  onChange={(event) =>
+                    setBirdCostForm((prev) => ({
+                      ...prev,
+                      birdsPurchased: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cost-per-bird">Cost/Bird (₦)</Label>
+                <Input
+                  id="cost-per-bird"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={birdCostForm.costPerBird}
+                  onChange={(event) =>
+                    setBirdCostForm((prev) => ({
+                      ...prev,
+                      costPerBird: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="vaccination-cost">Vaccination/Bird (₦)</Label>
+                <Input
+                  id="vaccination-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={birdCostForm.vaccinationCostPerBird}
+                  onChange={(event) =>
+                    setBirdCostForm((prev) => ({
+                      ...prev,
+                      vaccinationCostPerBird: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="laying-months">Laying Months</Label>
+                <Input
+                  id="laying-months"
+                  type="number"
+                  min="1"
+                  value={birdCostForm.expectedLayingMonths}
+                  onChange={(event) =>
+                    setBirdCostForm((prev) => ({
+                      ...prev,
+                      expectedLayingMonths: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="md:col-span-5">
+                <Button
+                  onClick={() => {
+                    void handleAddBirdCost();
+                  }}
+                  disabled={submittingBirdCost}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {submittingBirdCost ? "Saving..." : "Add Bird Cost"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You do not have permission to add bird cost entries.
+            </p>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Recent Bird Cost Batches</p>
+            {birdCostsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading bird costs...</p>
+            ) : birdCosts.length > 0 ? (
+              <div className="space-y-2">
+                {birdCosts.slice(0, 5).map((row, index) => (
+                  <div
+                    key={String(row.id ?? index)}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 p-3"
+                  >
+                    <span className="text-sm font-medium">
+                      {String(row.batchDate ?? "-")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {Number(row.birdsPurchased || 0).toLocaleString()} birds
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ₦{Number(row.costPerBird || 0).toLocaleString()} / bird
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {Number(row.expectedLayingMonths || 0)} months
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No bird cost batches yet. Add one to include bird cost in
+                calculations.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

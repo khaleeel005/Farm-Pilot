@@ -18,13 +18,16 @@ export interface ExpenseMonthRange {
 export interface ExpenseRecord {
   id?: number;
   date: string;
+  costType: CostEntry["costType"];
   category: string;
+  entryCategory: NonNullable<CostEntry["category"]>;
   description: string;
   amount: number;
   status: "verified" | "documented" | "recorded";
   submittedBy: string;
   receipt: string | null;
   vendor: string | null;
+  notes: string | null;
 }
 
 export interface ExpenseMetrics {
@@ -198,13 +201,16 @@ export function mapExpenseEntry(entry: CostEntry): ExpenseRecord {
   return {
     id: entry.id,
     date: entry.date,
+    costType: entry.costType,
     category: entry.category || entry.costType,
+    entryCategory: entry.category ?? "operational",
     description: entry.description,
     amount: entry.amount,
     status: getExpenseStatus(entry),
     submittedBy: entry.creator?.username || "Unknown",
     receipt: entry.receiptNumber || null,
     vendor: entry.vendor || null,
+    notes: entry.notes || null,
   };
 }
 

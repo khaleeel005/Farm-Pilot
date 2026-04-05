@@ -11,6 +11,7 @@ import {
   createBulkSales,
   getCustomers,
   getSales,
+  updateSale,
 } from "@/lib/api";
 import {
   calculateSalesOverview,
@@ -35,9 +36,14 @@ export interface UseSalesReturn {
   refresh: () => Promise<void>;
   createSale: (payload: SalePayload) => Promise<Sale>;
   createBulkSales: (payloads: SalePayload[]) => Promise<Sale[]>;
+  updateSale: (
+    id: number | string,
+    payload: Partial<SalePayload>,
+  ) => Promise<Sale>;
   createCustomer: (payload: CustomerPayload) => Promise<Customer>;
   summary: SalesSummary;
   isCreatingSale: boolean;
+  isUpdatingSale: boolean;
   isCreatingCustomer: boolean;
   isMutating: boolean;
 }
@@ -102,6 +108,19 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
     },
   });
 
+  const updateSaleMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number | string;
+      payload: Partial<SalePayload>;
+    }) => updateSale(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+    },
+  });
+
   const createCustomerMutation = useMutation({
     mutationFn: createCustomer,
     onSuccess: async () => {
@@ -123,6 +142,7 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
     customersQuery.error ||
     createSaleMutation.error ||
     createBulkSalesMutation.error ||
+    updateSaleMutation.error ||
     createCustomerMutation.error ||
     null;
 
@@ -140,12 +160,18 @@ export function useSales(initialFilters?: SalesFilters): UseSalesReturn {
     },
     createSale: (payload) => createSaleMutation.mutateAsync(payload),
     createBulkSales: (payloads) => createBulkSalesMutation.mutateAsync(payloads),
+    updateSale: (id, payload) =>
+      updateSaleMutation.mutateAsync({ id, payload }),
     createCustomer: (payload) => createCustomerMutation.mutateAsync(payload),
     summary,
     isCreatingSale: createSaleMutation.isPending || createBulkSalesMutation.isPending,
+    isUpdatingSale: updateSaleMutation.isPending,
     isCreatingCustomer: createCustomerMutation.isPending,
     isMutating:
-      createSaleMutation.isPending || createBulkSalesMutation.isPending || createCustomerMutation.isPending,
+      createSaleMutation.isPending ||
+      createBulkSalesMutation.isPending ||
+      updateSaleMutation.isPending ||
+      createCustomerMutation.isPending,
   };
 }
 

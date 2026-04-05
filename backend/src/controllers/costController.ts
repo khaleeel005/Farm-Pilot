@@ -1,6 +1,7 @@
 import costService from "../services/costService.js";
 import type { NextFunction, Request, Response } from "express";
 import { queryString } from "../utils/parsers.js";
+import { BadRequestError } from "../utils/exceptions.js";
 
 const costController = {
   getDaily: async (req: Request, res: Response, next: NextFunction) => {
@@ -33,11 +34,47 @@ const costController = {
     }
   },
 
+  getBirdCosts: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await costService.getBirdCosts();
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  createBirdCost: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await costService.createBirdCost(req.body);
+      res.status(201).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   getEggPrice: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const date = req.params.date;
       const data = await costService.getEggPriceEstimate(date);
       res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getHealthCostPerEgg: async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const date = req.params.date;
+      if (!date) {
+        throw new BadRequestError("date is required");
+      }
+
+      const healthCostPerEgg = await costService.calculateHealthCostPerEgg(date);
+      res.status(200).json({ success: true, data: { date, healthCostPerEgg } });
     } catch (err) {
       next(err);
     }

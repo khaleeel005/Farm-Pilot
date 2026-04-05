@@ -45,6 +45,46 @@ export async function getAverageMonthlyProduction(date: string) {
   return handleResponse(res);
 }
 
+export interface BirdCostPayload {
+  batchDate: string;
+  birdsPurchased: number;
+  costPerBird: number;
+  vaccinationCostPerBird?: number;
+  expectedLayingMonths?: number;
+}
+
+export interface BirdCostRecord extends BirdCostPayload {
+  id: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function getBirdCosts(): Promise<BirdCostRecord[]> {
+  const res = await fetchWithAuth(`${BASE}/api/costs/bird-costs`);
+  const data = await handleResponse<{ data?: BirdCostRecord[] }>(res);
+  return data?.data || [];
+}
+
+export async function createBirdCost(
+  payload: BirdCostPayload,
+): Promise<BirdCostRecord> {
+  const res = await fetchWithAuth(`${BASE}/api/costs/bird-costs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await handleResponse<{ data?: BirdCostRecord }>(res);
+  return data?.data as BirdCostRecord;
+}
+
+export async function getHealthCostPerEgg(date: string): Promise<number> {
+  const res = await fetchWithAuth(`${BASE}/api/costs/health-cost/${date}`);
+  const data = await handleResponse<{
+    data?: { date?: string; healthCostPerEgg?: number };
+  }>(res);
+  return Number(data?.data?.healthCostPerEgg || 0);
+}
+
 export async function getCostTypes() {
   const res = await fetchWithAuth(`${BASE}/api/cost-entries/types`);
   return handleResponse(res);

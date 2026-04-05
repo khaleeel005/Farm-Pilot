@@ -60,6 +60,14 @@ import { PageHeader } from "@/components/shared/page-header";
 import { CsvUploader } from "@/components/shared/csv-uploader";
 import type { SalePayload } from "@/types";
 
+interface SaleRowProps {
+  canMarkPaid: boolean;
+  markingAsPaid: boolean;
+  onMarkAsPaid: (sale: Sale) => Promise<void>;
+  sale: Sale;
+  customer?: Customer;
+}
+
 export function SalesManagement() {
   const {
     sales,
@@ -69,9 +77,11 @@ export function SalesManagement() {
     refresh,
     createSale,
     createBulkSales,
+    updateSale,
     createCustomer,
     summary,
     isCreatingSale,
+    isUpdatingSale,
     isCreatingCustomer,
   } = useSales();
   
@@ -91,9 +101,12 @@ export function SalesManagement() {
   );
   const toast = useToastContext();
 
-  const { canCreate: canCreateSale } = useResourcePermissions("SALES");
+  const { canCreate: canCreateSale, canUpdate: canUpdateSale } =
+    useResourcePermissions("SALES");
   const { canCreate: canCreateCustomer } =
     useResourcePermissions("CUSTOMERS");
+
+  const [updatingSaleId, setUpdatingSaleId] = useState<number | null>(null);
 
   const resetSaleForm = useCallback(() => {
     setSaleForm(createEmptySaleForm());
@@ -171,6 +184,30 @@ export function SalesManagement() {
   const customerNames = useMemo(() => {
     return new Map(customers.map((customer) => [customer.id, customer]));
   }, [customers]);
+
+  const handleMarkAsPaid = useCallback(
+    async (sale: Sale) => {
+      if (sale.paymentStatus === "paid") {
+        return;
+      }
+
+      try {
+        setUpdatingSaleId(sale.id);
+        await updateSale(sale.id, { paymentStatus: "paid" });
+        toast.success("Payment marked as paid.");
+      } catch (markError) {
+        console.error("Failed to update payment status:", markError);
+        toast.error(
+          markError instanceof Error
+            ? markError.message
+            : "Failed to mark payment as paid.",
+        );
+      } finally {
+        setUpdatingSaleId(null);
+      }
+    },
+    [toast, updateSale],
+  );
 
   if (loading && sales.length === 0 && customers.length === 0) {
     return <LoadingSpinner fullPage message="Loading sales data..." />;
@@ -552,14 +589,20 @@ export function SalesManagement() {
                     <TableHead>Crates</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sales.slice(0, 10).map((sale) => (
                     <SaleRow
                       key={sale.id}
+                      canMarkPaid={canUpdateSale}
                       sale={sale}
                       customer={sale.customerId != null ? customerNames.get(sale.customerId) : undefined}
+                      markingAsPaid={
+                        isUpdatingSale && updatingSaleId === sale.id
+                      }
+                      onMarkAsPaid={handleMarkAsPaid}
                     />
                   ))}
                 </TableBody>
@@ -636,12 +679,12 @@ function SummaryCard({
 }
 
 function SaleRow({
+  canMarkPaid,
+  markingAsPaid,
+  onMarkAsPaid,
   sale,
   customer,
-}: {
-  sale: Sale;
-  customer?: Customer;
-}) {
+}: SaleRowProps) {
   const totalCrates = Number(sale.quantity) || 0;
 
   return (
@@ -657,6 +700,22 @@ function SaleRow({
         <Badge variant={sale.paymentStatus === "paid" ? "default" : "destructive"}>
           {sale.paymentStatus}
         </Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        {canMarkPaid && sale.paymentStatus === "pending" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void onMarkAsPaid(sale);
+            }}
+            disabled={markingAsPaid}
+          >
+            {markingAsPaid ? "Updating..." : "Mark Paid"}
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
       </TableCell>
     </TableRow>
   );

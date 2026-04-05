@@ -2,6 +2,7 @@ import DailyLog from "../models/DailyLog.js";
 import FeedBatch from "../models/FeedBatch.js";
 import OperatingCost from "../models/OperatingCost.js";
 import Payroll from "../models/Payroll.js";
+import BirdCost from "../models/BirdCost.js";
 import { BadRequestError } from "../utils/exceptions.js";
 import { Op } from "sequelize";
 import type {
@@ -22,6 +23,54 @@ const toDailyLogs = (rows: unknown): DailyLogWithLegacyFeed[] =>
 const toPayrollRows = (rows: unknown): PayrollEntity[] => rows as PayrollEntity[];
 
 const costService = {
+  getBirdCosts: async () => {
+    return BirdCost.findAll({
+      order: [
+        ["batchDate", "DESC"],
+        ["createdAt", "DESC"],
+      ],
+    });
+  },
+
+  createBirdCost: async (data: Partial<BirdCostEntity>) => {
+    const batchDate = String(data.batchDate ?? "").trim();
+    const birdsPurchased = Number(data.birdsPurchased ?? 0);
+    const costPerBird = Number(data.costPerBird ?? 0);
+    const vaccinationCostPerBird = Number(data.vaccinationCostPerBird ?? 0);
+    const expectedLayingMonths = Number(data.expectedLayingMonths ?? 12);
+
+    if (!batchDate) {
+      throw new BadRequestError("batchDate is required");
+    }
+    if (!Number.isInteger(birdsPurchased) || birdsPurchased <= 0) {
+      throw new BadRequestError("birdsPurchased must be a positive integer");
+    }
+    if (!Number.isFinite(costPerBird) || costPerBird < 0) {
+      throw new BadRequestError("costPerBird must be a non-negative number");
+    }
+    if (
+      !Number.isFinite(vaccinationCostPerBird) ||
+      vaccinationCostPerBird < 0
+    ) {
+      throw new BadRequestError(
+        "vaccinationCostPerBird must be a non-negative number",
+      );
+    }
+    if (!Number.isInteger(expectedLayingMonths) || expectedLayingMonths <= 0) {
+      throw new BadRequestError(
+        "expectedLayingMonths must be a positive integer",
+      );
+    }
+
+    return BirdCost.create({
+      batchDate,
+      birdsPurchased,
+      costPerBird,
+      vaccinationCostPerBird,
+      expectedLayingMonths,
+    });
+  },
+
   // Helper function to get average monthly production (Design 7.1)
   getAverageMonthlyProduction: async (date: string | undefined) => {
     if (!date) throw new BadRequestError("date is required");
@@ -249,25 +298,6 @@ const costService = {
   calculateHealthCostPerEgg: async (date: string | undefined) => {
     if (!date) return 0;
 
-    // Import BirdCost lazily to avoid circular deps
-    type BirdCostModel = {
-      findAll: () => Promise<unknown[]>;
-    };
-    let birdCostModel: BirdCostModel | null = null;
-    try {
-      const imported = (await import("../models/BirdCost.js")) as {
-        default?: BirdCostModel;
-      };
-      birdCostModel = imported.default ?? null;
-      // Test if the model is properly initialized
-      if (!birdCostModel || typeof birdCostModel.findAll !== "function") {
-        return 0;
-      }
-    } catch {
-      // model not present or import failed
-      return 0;
-    }
-
     // Get total eggs produced on the date
     const logs = toDailyLogs(await DailyLog.findAll({ where: { logDate: date } }));
     const totalEggs = logs.reduce(
@@ -278,7 +308,7 @@ const costService = {
     // Find bird batches whose laying window includes the date
     let allBatches: BirdCostEntity[] = [];
     try {
-      allBatches = (await birdCostModel.findAll()) as BirdCostEntity[];
+      allBatches = (await BirdCost.findAll()) as unknown as BirdCostEntity[];
     } catch {
       // Database table might not exist
       return 0;

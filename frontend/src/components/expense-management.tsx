@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   Card,
   CardContent,
@@ -35,6 +37,7 @@ import {
   Download,
   CheckCircle,
   AlertCircle,
+  Edit,
 } from "lucide-react";
 import {
   buildCostTypeSelectOptions,
@@ -59,6 +62,7 @@ import {
 import type { CostEntry, CostTypeOption } from "@/types/entities/cost";
 import { PageHeader } from "@/components/shared/page-header";
 import { useExpenseManagement } from "@/hooks/useExpenseManagement";
+import { useResourcePermissions, useToastContext } from "@/hooks";
 
 interface ExpenseManagementProps {
   userRole?: "owner" | "staff";
@@ -71,6 +75,17 @@ interface AddExpenseDialogProps {
   onEntryChange: (updates: Partial<CostEntry>) => void;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
+  open: boolean;
+}
+
+interface EditExpenseDialogProps {
+  costTypes: CostTypeOption[];
+  draftEntry: Partial<CostEntry>;
+  expense: ExpenseRecord | null;
+  loading: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: () => void;
+  onUpdateDraft: (updates: Partial<CostEntry>) => void;
   open: boolean;
 }
 
@@ -107,6 +122,7 @@ export function ExpenseManagement({
     expenseMetrics,
     expenses,
     handleCreateCostEntry,
+    handleUpdateCostEntry,
     handleExport,
     initialLoading,
     isAddExpenseOpen,
@@ -118,7 +134,48 @@ export function ExpenseManagement({
     setSearchTerm,
     updateNewCostEntry,
   } = useExpenseManagement();
+  const { canUpdate } = useResourcePermissions("COST_ENTRIES");
+  const toast = useToastContext();
+  const [isEditExpenseOpen, setIsEditExpenseOpen] =
+    useState(false);
+  const [editingExpense, setEditingExpense] =
+    useState<ExpenseRecord | null>(null);
+  const [editDraft, setEditDraft] = useState<Partial<CostEntry>>({});
   const pageCopy = EXPENSE_PAGE_COPY[userRole];
+
+  const handleOpenEditExpense = (expense: ExpenseRecord) => {
+    setEditingExpense(expense);
+    setEditDraft({
+      date: expense.date,
+      costType: expense.costType,
+      description: expense.description,
+      amount: expense.amount,
+      category: expense.entryCategory,
+      vendor: expense.vendor || "",
+      notes: expense.notes || "",
+    });
+    setIsEditExpenseOpen(true);
+  };
+
+  const handleEditDraftChange = (updates: Partial<CostEntry>) => {
+    setEditDraft((previous) => ({ ...previous, ...updates }));
+  };
+
+  const handleSubmitEditExpense = async () => {
+    if (!editingExpense?.id) {
+      toast.error("Unable to edit this expense.");
+      return;
+    }
+
+    const didUpdate = await handleUpdateCostEntry(editingExpense.id, editDraft);
+    if (!didUpdate) {
+      return;
+    }
+
+    setIsEditExpenseOpen(false);
+    setEditingExpense(null);
+    setEditDraft({});
+  };
 
   if (initialLoading) {
     return <ExpenseLoadingState />;
@@ -152,14 +209,35 @@ export function ExpenseManagement({
       />
 
       <ExpenseListCard
+        canEdit={canUpdate}
         categoryFilter={categoryFilter}
         expenses={expenses}
         exportedRows={expenseMetrics.exportedRows}
         searchTerm={searchTerm}
         userRole={userRole}
+        onEditExpense={handleOpenEditExpense}
         onCategoryChange={setCategoryFilter}
         onExport={handleExport}
         onSearchTermChange={setSearchTerm}
+      />
+
+      <EditExpenseDialog
+        costTypes={costTypes}
+        draftEntry={editDraft}
+        expense={editingExpense}
+        loading={loading}
+        onOpenChange={(open) => {
+          setIsEditExpenseOpen(open);
+          if (!open) {
+            setEditingExpense(null);
+            setEditDraft({});
+          }
+        }}
+        onSubmit={() => {
+          void handleSubmitEditExpense();
+        }}
+        onUpdateDraft={handleEditDraftChange}
+        open={isEditExpenseOpen}
       />
     </div>
   );
@@ -334,6 +412,53 @@ function AddExpenseDialog({
   );
 }
 
+function EditExpenseDialog({
+  costTypes,
+  draftEntry,
+  expense,
+  loading,
+  onOpenChange,
+  onSubmit,
+  onUpdateDraft,
+  open,
+}: EditExpenseDialogProps) {
+  if (!expense) {
+    return null;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit Expense</DialogTitle>
+          <DialogDescription>
+            Update this expense entry and save your changes.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 py-2">
+          <ExpenseDetailsSection
+            costTypes={costTypes}
+            newCostEntry={draftEntry}
+            onEntryChange={onUpdateDraft}
+          />
+          <ExpenseMetadataSection
+            newCostEntry={draftEntry}
+            onEntryChange={onUpdateDraft}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={loading}>
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ExpenseSelect({
   id,
   onChange,
@@ -447,22 +572,26 @@ function ExpenseStatsCards({
 }
 
 interface ExpenseListCardProps {
+  canEdit: boolean;
   categoryFilter: ExpenseCategory;
   expenses: ExpenseRecord[];
   exportedRows: number;
   searchTerm: string;
   userRole: "owner" | "staff";
+  onEditExpense: (expense: ExpenseRecord) => void;
   onCategoryChange: (value: ExpenseCategory) => void;
   onExport: () => void;
   onSearchTermChange: (value: string) => void;
 }
 
 function ExpenseListCard({
+  canEdit,
   categoryFilter,
   expenses,
   exportedRows,
   searchTerm,
   userRole,
+  onEditExpense,
   onCategoryChange,
   onExport,
   onSearchTermChange,
@@ -531,9 +660,21 @@ function ExpenseListCard({
                   <ExpenseStatusBadge status={expense.status} />
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {getExpenseReceiptLabel(expense.receipt)}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {getExpenseReceiptLabel(expense.receipt)}
+                    </span>
+                    {canEdit && expense.id ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onEditExpense(expense)}
+                      >
+                        <Edit className="mr-1.5 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

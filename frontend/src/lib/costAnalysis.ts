@@ -1,6 +1,7 @@
 import type { Sale } from "@/types";
 
 export interface CostBreakdown {
+  birdCost: number;
   feedCost: number;
   fixedCosts: number;
   healthCosts: number;
@@ -27,6 +28,7 @@ export interface CostEstimate {
   avgDailyProduction?: number;
   avgMonthlyProduction?: number;
   date: string;
+  birdCostPerEgg?: number;
   feedCostPerEgg?: number;
   fixedCostPerEgg?: number;
   healthCostPerEgg?: number;
@@ -73,11 +75,16 @@ export function calculateAverageSellingPrice(sales: Sale[]): number {
 }
 
 export function buildCostBreakdown(costEstimate: CostEstimate | null): CostBreakdown {
+  const birdCost =
+    toNumber(costEstimate?.birdCostPerEgg) ||
+    toNumber(costEstimate?.healthCostPerEgg);
+
   return {
+    birdCost,
     feedCost: toNumber(costEstimate?.feedCostPerEgg),
     laborCost: toNumber(costEstimate?.laborCostPerEgg),
     fixedCosts: toNumber(costEstimate?.fixedCostPerEgg),
-    healthCosts: toNumber(costEstimate?.healthCostPerEgg),
+    healthCosts: birdCost,
     total: toNumber(costEstimate?.totalCostPerEgg),
   };
 }
@@ -87,7 +94,7 @@ export function getCostBreakdownItems(costBreakdown: CostBreakdown) {
     { key: "feed", label: "Feed Cost", amount: costBreakdown.feedCost },
     { key: "labor", label: "Labor Cost", amount: costBreakdown.laborCost },
     { key: "fixed", label: "Fixed Costs", amount: costBreakdown.fixedCosts },
-    { key: "health", label: "Health Costs", amount: costBreakdown.healthCosts },
+    { key: "bird", label: "Bird Cost", amount: costBreakdown.birdCost },
   ];
 }
 

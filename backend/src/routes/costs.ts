@@ -62,6 +62,46 @@ router.get(
   costController.getAverageMonthlyProduction
 );
 
+router.get(
+  "/health-cost/:date",
+  authorize(PERMISSIONS.COSTS.READ),
+  [
+    param("date").isISO8601().withMessage("date must be YYYY-MM-DD"),
+    handleValidation,
+  ],
+  costController.getHealthCostPerEgg
+);
+
+router.get(
+  "/bird-costs",
+  authorize(PERMISSIONS.COSTS.READ),
+  costController.getBirdCosts
+);
+
+router.post(
+  "/bird-costs",
+  authorize(PERMISSIONS.COSTS.WRITE),
+  [
+    body("batchDate").isISO8601().withMessage("batchDate must be YYYY-MM-DD"),
+    body("birdsPurchased")
+      .isInt({ min: 1 })
+      .withMessage("birdsPurchased must be a positive integer"),
+    body("costPerBird")
+      .isFloat({ min: 0 })
+      .withMessage("costPerBird must be a non-negative number"),
+    body("vaccinationCostPerBird")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("vaccinationCostPerBird must be a non-negative number"),
+    body("expectedLayingMonths")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("expectedLayingMonths must be a positive integer"),
+    handleValidation,
+  ],
+  costController.createBirdCost
+);
+
 // POST - owner only for creating operating costs
 router.post(
   "/operating",
