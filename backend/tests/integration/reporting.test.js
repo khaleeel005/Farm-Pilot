@@ -242,15 +242,11 @@ describe("Reporting Flow", () => {
 
     if (res.statusCode === 200) {
       const totalAmount = res.body.data.totalAmount;
-      const totalEggs = res.body.data.totalEggs;
+      const totalCrates = res.body.data.totalCrates;
 
       // totalAmount might be 0 if not calculated during creation
-      // but totalEggs should be > 0 since we created sales
-      expect(totalEggs).toBeGreaterThan(0);
-
-      // Calculate actual dozens from total eggs
-      const actualDozens = Math.floor(totalEggs / 12);
-      expect(actualDozens).toBeGreaterThan(0);
+      // but totalCrates should be > 0 since we created sales
+      expect(totalCrates).toBeGreaterThan(0);
     }
   });
 

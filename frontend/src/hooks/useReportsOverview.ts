@@ -35,6 +35,7 @@ export function reportsOverviewQueryOptions(dateRange: ReportsDateRange) {
   return queryOptions({
     queryKey: ["reports-overview", dateRange],
     queryFn: () => fetchReportsOverview(dateRange),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 

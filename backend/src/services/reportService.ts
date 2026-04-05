@@ -52,10 +52,23 @@ const reportService = {
 
   getFinancialReport: async (start: string | undefined, end: string | undefined) => {
     if (!start || !end) throw new BadRequestError("start and end are required");
-    // Operating costs by month within range
+    // Operating costs: Since monthYear is stored as a date (e.g., YYYY-MM-01),
+    // and the incoming start/end might be mid-month, we adjust the query to include
+    // any OperatingCost whose monthYear falls in the same month(s) as the start/end dates.
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    
+    const trueStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+      .toISOString()
+      .split("T")[0];
+    
+    const trueEnd = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0];
+
     const ops = toPlainRows<OperatingCostEntity>(
       await OperatingCost.findAll({
-        where: { monthYear: { [Op.between]: [start, end] } },
+        where: { monthYear: { [Op.between]: [trueStart, trueEnd] } },
       }),
     );
     const totalOperating = ops.reduce(
@@ -63,7 +76,7 @@ const reportService = {
       0
     );
 
-    // Sales total
+    // Sales total (keeps original exact date filter)
     const sales = toPlainRows<SalesEntity>(
       await Sales.findAll({
         where: { saleDate: { [Op.between]: [start, end] } },
@@ -181,21 +194,34 @@ const reportService = {
       // Header
       const firstRow = rows[0];
       const headers = firstRow ? Object.keys(firstRow) : [];
-      headers.forEach((h) => {
+      
+      // Calculate equal column width based on available page width (595 - 2*40 margins = 515)
+      const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const colWidth = headers.length > 0 ? usableWidth / headers.length : 100;
+
+      // Draw Headers
+      let currentY = doc.y;
+      headers.forEach((h, i) => {
         doc
           .font("Helvetica-Bold")
-          .text(h.toUpperCase(), { continued: true, width: 100 });
-        doc.text(" ", { continued: true });
+          .text(h.toUpperCase(), doc.page.margins.left + (i * colWidth), currentY, { width: colWidth, align: "left" });
       });
       doc.moveDown(0.5);
 
       // Rows
       rows.forEach((r) => {
-        Object.values(r).forEach((v) => {
+        currentY = doc.y;
+        
+        // Add a new page if we are too close to the bottom margin
+        if (currentY > doc.page.height - doc.page.margins.bottom - 20) {
+          doc.addPage();
+          currentY = doc.y;
+        }
+
+        Object.values(r).forEach((v, i) => {
           doc
             .font("Helvetica")
-            .text(String(v), { continued: true, width: 100 });
-          doc.text(" ", { continued: true });
+            .text(String(v), doc.page.margins.left + (i * colWidth), currentY, { width: colWidth, align: "left", continued: false });
         });
         doc.moveDown(0.5);
       });

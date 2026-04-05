@@ -370,32 +370,34 @@ function ProductionTabContent({
         </CardHeader>
         <CardContent>
           {productionData?.logs && productionData.logs.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Eggs Collected</TableHead>
-                  <TableHead>Cracked</TableHead>
-                  <TableHead>Feed Used (bags)</TableHead>
-                  <TableHead>Mortality</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {productionData.logs.slice(0, 10).map((log, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">
-                      {new Date(log.logDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {(log.eggsCollected || 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell>{log.crackedEggs || 0}</TableCell>
-                    <TableCell>{log.feedBagsUsed || 0}</TableCell>
-                    <TableCell>{log.mortalityCount || 0}</TableCell>
+            <div className="max-h-[400px] overflow-y-auto w-full">
+              <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Eggs Collected</TableHead>
+                    <TableHead>Cracked</TableHead>
+                    <TableHead>Feed Used (bags)</TableHead>
+                    <TableHead>Mortality</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {productionData.logs.map((log, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">
+                        {new Date(log.logDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {(log.eggsCollected || 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell>{log.crackedEggs || 0}</TableCell>
+                      <TableCell>{log.feedBagsUsed || 0}</TableCell>
+                      <TableCell>{log.mortalityCount || 0}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <EmptyState
               variant="logs"
@@ -676,6 +678,9 @@ function QuickExportActions({
 
 export function ReportsSection() {
   const [dateRange, setDateRange] = useState<ReportsDateRange>("last-30-days");
+  // Default active tab to overview since that's what Tabs defaults to
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  // reportType remains for the general configuration card dropdown defaults
   const [reportType, setReportType] = useState<ReportsTab>("production");
   const [exportFormat, setExportFormat] = useState<ReportsExportFormat>("pdf");
   const [exporting, setExporting] = useState(false);
@@ -730,6 +735,9 @@ export function ReportsSection() {
     );
   }
 
+  // Derive the active tab safely for the export button
+  const currentExportTab: ReportsTab = activeTab === "overview" ? reportType : (activeTab as ReportsTab);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -745,7 +753,7 @@ export function ReportsSection() {
             onRefresh={() => {
               void refetch();
             }}
-            reportType={reportType}
+            reportType={currentExportTab}
           />
         }
       />
@@ -756,10 +764,14 @@ export function ReportsSection() {
         onDateRangeChange={(value) => setDateRange(value)}
         onExportFormatChange={(value) => setExportFormat(value)}
         onReportTypeChange={(value) => setReportType(value)}
-        reportType={reportType}
+        reportType={currentExportTab}
       />
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">
             Overview

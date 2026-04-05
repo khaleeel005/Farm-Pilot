@@ -82,10 +82,18 @@ export function getReportDateRange(
     default:
       start.setDate(end.getDate() - 30);
   }
+  
+  // Format dates in local timezone before returning (YYYY-MM-DD)
+  const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   return {
-    startDate: start.toISOString().split("T")[0],
-    endDate: end.toISOString().split("T")[0],
+    startDate: formatLocalDate(start),
+    endDate: formatLocalDate(end),
   };
 }
 
@@ -115,10 +123,12 @@ export function buildReportsOverviewData(input: {
     salesData?.rows.filter((row) => row.paymentStatus === "pending").length || 0;
 
   const totalOperatingCosts = financialData?.totalOperating || 0;
-  const netProfit = totalRevenue - totalOperatingCosts;
+  // Use consistent totalSales from financial data if available, fallback to totalRevenue from sales
+  const consistentRevenue = financialData?.totalSales ?? totalRevenue;
+  const netProfit = consistentRevenue - totalOperatingCosts;
   const profitMargin =
-    totalRevenue > 0
-      ? Math.round((netProfit / totalRevenue) * 100 * 10) / 10
+    consistentRevenue > 0
+      ? Math.round((netProfit / consistentRevenue) * 100 * 10) / 10
       : 0;
 
   return {
@@ -158,19 +168,17 @@ function buildTopCustomers(
     return [];
   }
 
-  const customerSalesMap = new Map<number, { orders: number; revenue: number }>();
+  const customerSalesMap = new Map<number | "walk-in", { orders: number; revenue: number }>();
 
   salesData.rows.forEach((sale) => {
-    if (!sale.customerId) {
-      return;
-    }
+    const key = sale.customerId || "walk-in";
 
-    const existing = customerSalesMap.get(sale.customerId) || {
+    const existing = customerSalesMap.get(key) || {
       orders: 0,
       revenue: 0,
     };
 
-    customerSalesMap.set(sale.customerId, {
+    customerSalesMap.set(key, {
       orders: existing.orders + 1,
       revenue: existing.revenue + (Number(sale.totalAmount) || 0),
     });
@@ -178,14 +186,18 @@ function buildTopCustomers(
 
   const summaries: CustomerSummary[] = [];
 
-  customerSalesMap.forEach((value, customerId) => {
-    const customer = customers.find((entry) => entry.id === customerId);
-    if (!customer) {
-      return;
+  customerSalesMap.forEach((value, key) => {
+    let name = "Walk-in Customers";
+    if (key !== "walk-in") {
+      const customer = customers.find((entry) => entry.id === key);
+      if (!customer) {
+        return;
+      }
+      name = customer.customerName;
     }
 
     summaries.push({
-      name: customer.customerName,
+      name,
       orders: value.orders,
       revenue: value.revenue,
       avgOrder: value.orders > 0 ? Math.round(value.revenue / value.orders) : 0,
