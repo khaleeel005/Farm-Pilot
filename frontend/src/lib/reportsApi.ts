@@ -173,7 +173,7 @@ export async function getDashboardSummary(
   const pendingPayments =
     sales?.rows
       .filter((row) => row.paymentStatus === "pending")
-      .reduce((sum, row) => sum + row.totalAmount, 0) || 0;
+      .reduce((sum, row) => sum + Number(row.totalAmount), 0) || 0;
 
   const totalOperating = financial?.totalOperating || 0;
   const profitMargin =

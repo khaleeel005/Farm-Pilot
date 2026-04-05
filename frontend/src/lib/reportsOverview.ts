@@ -258,7 +258,7 @@ function buildWeeklyReportSummary(
       days: new Set<string>(),
     };
 
-    existing.sales += sale.totalAmount || 0;
+    existing.sales += Number(sale.totalAmount) || 0;
     existing.days.add(sale.saleDate);
     weekBuckets.set(weekIndex, existing);
   });

@@ -55,16 +55,15 @@ const reportService = {
     // Operating costs: Since monthYear is stored as a date (e.g., YYYY-MM-01),
     // and the incoming start/end might be mid-month, we adjust the query to include
     // any OperatingCost whose monthYear falls in the same month(s) as the start/end dates.
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    
-    const trueStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-    
-    const trueEnd = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0)
-      .toISOString()
-      .split("T")[0];
+    const startParts = start.split('-');
+    const trueStart = `${startParts[0]}-${startParts[1]}-01`;
+
+    const endParts = end.split('-');
+    const endYear = parseInt(endParts[0] || "0", 10);
+    const endMonth = parseInt(endParts[1] || "0", 10);
+    // getting the last day of the month accurately without timezone shifts
+    const lastDay = new Date(Date.UTC(endYear, endMonth, 0)).getUTCDate();
+    const trueEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     const ops = toPlainRows<OperatingCostEntity>(
       await OperatingCost.findAll({

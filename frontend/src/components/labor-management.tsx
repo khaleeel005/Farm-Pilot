@@ -46,7 +46,7 @@ import { PageHeader } from "@/components/shared/page-header";
 
 export function LaborManagement() {
   const [monthYear, setMonthYear] = useState(() =>
-    new Date().toISOString().slice(0, 7),
+    new Date().toLocaleDateString("en-CA").slice(0, 7),
   );
   const [showNewWorker, setShowNewWorker] = useState(false);
   const [deleteConfirmWorker, setDeleteConfirmWorker] =

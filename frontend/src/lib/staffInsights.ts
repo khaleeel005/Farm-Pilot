@@ -65,7 +65,7 @@ const MONDAY_FIRST_ORDER = [
 ] as const;
 
 function toDateValue(date: Date) {
-  return date.toISOString().split("T")[0];
+  return date.toLocaleDateString("en-CA");
 }
 
 function getAssignmentDateValue(assignment: WorkAssignment) {

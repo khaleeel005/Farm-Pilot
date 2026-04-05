@@ -32,7 +32,7 @@ export interface SalesOverviewMetrics {
 }
 
 export function getTodayDateValue() {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toLocaleDateString("en-CA");
 }
 
 export function createEmptySaleForm(): SaleFormData {

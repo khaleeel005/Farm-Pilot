@@ -16,7 +16,7 @@ export interface DailyLogStats {
 }
 
 export function getTodayIsoDate() {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toLocaleDateString("en-CA");
 }
 
 export function normalizeDailyLogFilters(filters: DailyLogFilters = {}) {

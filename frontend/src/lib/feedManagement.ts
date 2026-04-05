@@ -43,7 +43,7 @@ export function createEmptyIngredientInput(): IngredientInput {
 export function createEmptyFeedBatchForm(): FeedBatchFormData {
   return {
     batchName: "",
-    batchDate: new Date().toISOString().split("T")[0],
+    batchDate: new Date().toLocaleDateString("en-CA"),
     totalBags: "",
     miscellaneousCost: 0,
     ingredients: [createEmptyIngredientInput()],

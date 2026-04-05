@@ -879,7 +879,7 @@ export function FeedManagement() {
   const handleDuplicateBatch = (batch: FeedBatch) => {
     setNewBatch({
       batchName: `${batch.batchName} (Copy)`,
-      batchDate: new Date().toISOString().split("T")[0],
+      batchDate: new Date().toLocaleDateString("en-CA"),
       totalBags: batch.totalBags || "",
       miscellaneousCost: batch.miscellaneousCost || 0,
       ingredients: batch.ingredients?.map((ing) => ({

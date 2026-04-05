@@ -144,7 +144,7 @@ export function validateFeedBagUsage(
 export function buildDailyLogPayload(
   formData: DailyLogFormValues,
   selectedHouse: string,
-  logDate = new Date().toISOString().slice(0, 10),
+  logDate = new Date().toLocaleDateString("en-CA"),
 ): DailyLogPayload {
   const crates = Number.parseInt(formData.eggCrates, 10) || 0;
   const pieces = Number.parseInt(formData.eggPieces, 10) || 0;

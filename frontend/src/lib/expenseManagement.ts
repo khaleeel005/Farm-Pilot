@@ -42,7 +42,7 @@ export interface ExpenseSelectOption {
 
 export function createEmptyCostEntry(): Partial<CostEntry> {
   return {
-    date: new Date().toISOString().split("T")[0],
+    date: new Date().toLocaleDateString("en-CA"),
     costType: undefined,
     description: "",
     amount: 0,

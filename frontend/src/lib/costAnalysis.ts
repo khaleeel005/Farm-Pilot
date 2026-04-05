@@ -56,7 +56,7 @@ function toNumber(value: unknown): number {
 }
 
 export function getTodayIsoDate(): string {
-  return new Date().toISOString().split("T")[0] ?? "";
+  return new Date().toLocaleDateString("en-CA") ?? "";
 }
 
 export function calculateAverageSellingPrice(sales: Sale[]): number {
