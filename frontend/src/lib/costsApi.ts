@@ -9,14 +9,16 @@ const BASE = API_BASE_URL;
 
 export async function getDailyCosts(date: string) {
   const res = await fetchWithAuth(`${BASE}/api/costs/daily/${date}`);
-  return handleResponse(res);
+  const payload = await handleResponse<{ data?: unknown }>(res);
+  return (payload as { data?: unknown })?.data ?? payload;
 }
 
 export async function getCostsSummary(start: string, end: string) {
   const res = await fetchWithAuth(
     `${BASE}/api/costs/summary?start=${start}&end=${end}`,
   );
-  return handleResponse(res);
+  const payload = await handleResponse<{ data?: unknown }>(res);
+  return (payload as { data?: unknown })?.data ?? payload;
 }
 
 export async function createOperatingCost(payload: Partial<OperatingCost>) {
@@ -25,24 +27,28 @@ export async function createOperatingCost(payload: Partial<OperatingCost>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return handleResponse(res);
+  const body = await handleResponse<{ data?: unknown }>(res);
+  return (body as { data?: unknown })?.data ?? body;
 }
 
 export async function getEggPriceEstimate(date: string) {
   const res = await fetchWithAuth(`${BASE}/api/costs/egg-price/${date}`);
-  return handleResponse(res);
+  const payload = await handleResponse<{ data?: unknown }>(res);
+  return (payload as { data?: unknown })?.data ?? payload;
 }
 
 export async function getDailyCalculation(date: string) {
   const res = await fetchWithAuth(
     `${BASE}/api/costs/daily-calculation/${date}`,
   );
-  return handleResponse(res);
+  const payload = await handleResponse<{ data?: unknown }>(res);
+  return (payload as { data?: unknown })?.data ?? payload;
 }
 
 export async function getAverageMonthlyProduction(date: string) {
   const res = await fetchWithAuth(`${BASE}/api/costs/avg-production/${date}`);
-  return handleResponse(res);
+  const payload = await handleResponse<{ data?: unknown }>(res);
+  return (payload as { data?: unknown })?.data ?? payload;
 }
 
 export interface BirdCostPayload {

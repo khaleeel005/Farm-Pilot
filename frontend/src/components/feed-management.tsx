@@ -628,6 +628,12 @@ function FeedBatchRow({
   usageStats: BatchUsageStats | null;
 }) {
   const usagePercentage = usageStats?.usagePercentage ?? 0;
+  const ingredientNames =
+    batch.ingredients
+      ?.map((ingredient) => ingredient.ingredientName?.trim())
+      .filter((name): name is string => Boolean(name)) ?? [];
+  const previewNames = ingredientNames.slice(0, 2).join(", ");
+  const remainingIngredientCount = Math.max(ingredientNames.length - 2, 0);
 
   return (
     <TableRow>
@@ -697,14 +703,24 @@ function FeedBatchRow({
         {formatFeedCurrency(Number(batch.costPerBag))}
       </TableCell>
       <TableCell>
-        <div className="flex flex-wrap gap-1 max-w-[200px]">
-          {batch.ingredients?.map((ingredient, index) => (
-            <Badge key={index} variant="secondary" className="text-xs">
-              {ingredient.ingredientName} (
-              {Number(ingredient.quantityKg).toFixed(2)}
-              kg)
-            </Badge>
-          ))}
+        <div className="max-w-[220px] space-y-1">
+          <p className="text-sm font-medium">
+            {ingredientNames.length} ingredient
+            {ingredientNames.length === 1 ? "" : "s"}
+          </p>
+          {ingredientNames.length > 0 ? (
+            <p
+              className="truncate text-xs text-muted-foreground"
+              title={ingredientNames.join(", ")}
+            >
+              {previewNames}
+              {remainingIngredientCount > 0
+                ? ` +${remainingIngredientCount} more`
+                : ""}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">No ingredients listed</p>
+          )}
         </div>
       </TableCell>
       <TableCell>

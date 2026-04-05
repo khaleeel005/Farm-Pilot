@@ -62,7 +62,13 @@ export function getTodayIsoDate(): string {
 }
 
 export function calculateAverageSellingPrice(sales: Sale[]): number {
-  const totals = sales.reduce(
+  const paidSales = sales.filter(
+    (sale) => String(sale.paymentStatus || "").toLowerCase() === "paid",
+  );
+
+  const sourceSales = paidSales.length > 0 ? paidSales : sales;
+
+  const totals = sourceSales.reduce(
     (sum, sale) => ({
       revenue: sum.revenue + toNumber(sale.totalAmount),
       quantity: sum.quantity + toNumber(sale.quantity),
@@ -141,8 +147,8 @@ export function buildCostAnalysisOverviewData(input: {
 }): CostAnalysisOverviewData {
   const costBreakdown = buildCostBreakdown(input.costEstimate);
   const avgSellingPrice = calculateAverageSellingPrice(input.sales);
-  const effectiveSellingPrice =
-    avgSellingPrice || toNumber(input.costEstimate?.suggestedPrice);
+  const fallbackSuggestedPrice = toNumber(input.costEstimate?.suggestedPrice);
+  const effectiveSellingPrice = avgSellingPrice;
   const profitPerEgg = effectiveSellingPrice - costBreakdown.total;
   const avgDailyProduction = toNumber(input.costEstimate?.avgDailyProduction);
   const monthlyProjection: MonthlyProjection = {
@@ -155,7 +161,7 @@ export function buildCostAnalysisOverviewData(input: {
   const pricingRecommendation: PricingData = {
     cost: costBreakdown.total,
     markup: DEFAULT_MARKUP,
-    suggested: toNumber(input.costEstimate?.suggestedPrice),
+    suggested: fallbackSuggestedPrice,
     current: effectiveSellingPrice,
   };
   const profitMargin = getProfitMargin(effectiveSellingPrice, profitPerEgg);
