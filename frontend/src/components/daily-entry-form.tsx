@@ -70,6 +70,7 @@ import type { FarmWorker } from "@/lib/farmWorkers";
 import type { TodaySummary } from "@/types";
 
 interface ProductionEntryCardProps {
+  entryDate: string;
   feedBagsError: string;
   feedBatches: FeedBatch[];
   feedInventoryLoading: boolean;
@@ -79,6 +80,7 @@ interface ProductionEntryCardProps {
   isFeedBagUsageValid: boolean;
   isFormValid: boolean;
   isSubmitting: boolean;
+  onEntryDateChange: (value: string) => void;
   onFeedBagsChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onFormDataChange: (updates: Partial<DailyLogFormValues>) => void;
   onHouseChange: (value: string) => void;
@@ -92,8 +94,24 @@ interface ProductionEntryCardProps {
 
 interface SidePanelProps {
   alerts: string[];
+  summaryDate: string;
   todaySummary: TodaySummary;
   workers: FarmWorker[];
+}
+
+function formatLogDateForDisplay(logDate: string): string {
+  const parsedDate = new Date(`${logDate}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return logDate;
+  }
+
+  return parsedDate.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 function HouseSelectionSection({
@@ -379,6 +397,7 @@ function FeedHealthSection({
 
 function ProductionEntryCard({
   batchUsageStats,
+  entryDate,
   eggsPerCrate,
   feedBagsError,
   feedBatches,
@@ -389,6 +408,7 @@ function ProductionEntryCard({
   isFeedBagUsageValid,
   isFormValid,
   isSubmitting,
+  onEntryDateChange,
   onFeedBagsChange,
   onFormDataChange,
   onHouseChange,
@@ -404,17 +424,24 @@ function ProductionEntryCard({
           <CalendarDays className="h-5 w-5" />
           Production Entry
         </CardTitle>
-        <CardDescription>
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </CardDescription>
+        <CardDescription>{formatLogDateForDisplay(entryDate)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={onSubmit} className="space-y-5">
+          <div className="space-y-2 rounded-xl border border-border/70 bg-background/55 p-4">
+            <Label htmlFor="log-date">Log Date</Label>
+            <Input
+              id="log-date"
+              type="date"
+              value={entryDate}
+              onChange={(event) =>
+                onEntryDateChange(event.target.value || getTodayIsoDate())
+              }
+            />
+          </div>
+
+          <Separator className="opacity-60" />
+
           <HouseSelectionSection
             houses={houses}
             housesLoading={housesLoading}
@@ -459,7 +486,13 @@ function ProductionEntryCard({
   );
 }
 
-function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
+function TodaySummaryCard({
+  summaryDate,
+  todaySummary,
+}: {
+  summaryDate: string;
+  todaySummary: TodaySummary;
+}) {
   const totalCrates = Math.floor(todaySummary.totalEggs / EGGS_PER_CRATE);
   const totalPieces = todaySummary.totalEggs % EGGS_PER_CRATE;
 
@@ -468,8 +501,9 @@ function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Home className="h-5 w-5" />
-          Today's Summary
+          Daily Summary
         </CardTitle>
+        <CardDescription>{formatLogDateForDisplay(summaryDate)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 text-center">
@@ -511,7 +545,7 @@ function TodaySummaryCard({ todaySummary }: { todaySummary: TodaySummary }) {
             })
           ) : (
             <div className="text-sm text-muted-foreground text-center py-2">
-              No logs recorded today
+              No logs recorded for this date
             </div>
           )}
         </div>
@@ -605,10 +639,10 @@ function AlertsCard({ alerts }: { alerts: string[] }) {
   );
 }
 
-function SidePanel({ alerts, todaySummary, workers }: SidePanelProps) {
+function SidePanel({ alerts, summaryDate, todaySummary, workers }: SidePanelProps) {
   return (
     <div className="space-y-6">
-      <TodaySummaryCard todaySummary={todaySummary} />
+      <TodaySummaryCard summaryDate={summaryDate} todaySummary={todaySummary} />
       <WorkerAssignmentCard workers={workers} />
       <AlertsCard alerts={alerts} />
     </div>
@@ -626,8 +660,8 @@ export function DailyEntryForm() {
     batchUsageStats,
     loading: feedInventoryLoading,
   } = useFeedInventory();
-  const todayIsoDate = useMemo(() => getTodayIsoDate(), []);
-  const { logs: todayLogs } = useDailyLogs({ date: todayIsoDate } as DailyLogFilters);
+  const [selectedLogDate, setSelectedLogDate] = useState(getTodayIsoDate);
+  const { logs: todayLogs } = useDailyLogs({ date: selectedLogDate } as DailyLogFilters);
   const { workers } = useFarmWorkers();
   const createDailyLogMutation = useCreateDailyLog();
   const toast = useToastContext();
@@ -738,7 +772,7 @@ export function DailyEntryForm() {
       const payload: DailyLogPayload = buildDailyLogPayload(
         formData,
         selectedHouse,
-        todayIsoDate,
+        selectedLogDate,
       );
 
       await createDailyLogMutation.mutateAsync(payload);
@@ -777,7 +811,7 @@ export function DailyEntryForm() {
             : Number(row.EggsCollected || row.eggsCollected) || 0;
 
         return {
-          logDate: row.Date || row.logDate || todayIsoDate,
+          logDate: row.Date || row.logDate || selectedLogDate,
           houseId: Number(row.HouseId || row.houseId),
           eggsCollected,
           crackedEggs: Number(row.CrackedEggs || row.crackedEggs) || 0,
@@ -819,7 +853,7 @@ export function DailyEntryForm() {
       <PageHeader
         eyebrow="Daily Operations"
         title="Daily Entry"
-        description="Record today's production, feed usage, and observations"
+        description="Record production, feed usage, and observations for any date"
         actions={headerActions}
       />
 
@@ -827,6 +861,7 @@ export function DailyEntryForm() {
         <div className="space-y-6">
           <ProductionEntryCard
             batchUsageStats={batchUsageStats}
+            entryDate={selectedLogDate}
             eggsPerCrate={eggsPerCrate}
             feedBagsError={feedBagsError}
             feedBatches={feedBatches}
@@ -837,6 +872,7 @@ export function DailyEntryForm() {
             isFeedBagUsageValid={isFeedBagUsageValid}
             isFormValid={isFormValid}
             isSubmitting={createDailyLogMutation.isPending}
+            onEntryDateChange={setSelectedLogDate}
             onFeedBagsChange={handleFeedBagsChange}
             onFormDataChange={updateFormData}
             onHouseChange={setSelectedHouse}
@@ -847,7 +883,12 @@ export function DailyEntryForm() {
           />
         </div>
 
-        <SidePanel alerts={alerts} todaySummary={todaySummary} workers={workers} />
+        <SidePanel
+          alerts={alerts}
+          summaryDate={selectedLogDate}
+          todaySummary={todaySummary}
+          workers={workers}
+        />
       </div>
     </div>
   );
