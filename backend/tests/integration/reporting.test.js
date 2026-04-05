@@ -107,7 +107,7 @@ describe("Reporting Flow", () => {
         saleDate: date,
         customerId: customerId,
         quantity: Math.floor(Math.random() * 45) + 17,
-        pricePerEgg: 22.0,
+        pricePerCrate: 2200.0,
         paymentMethod: "cash",
         paymentStatus: "paid",
       });
@@ -153,7 +153,7 @@ describe("Reporting Flow", () => {
     expect(res.body.data).toHaveProperty("start", "2025-08-01");
     expect(res.body.data).toHaveProperty("end", "2025-08-31");
     expect(res.body.data).toHaveProperty("totalAmount");
-    expect(res.body.data).toHaveProperty("totalEggs");
+    expect(res.body.data).toHaveProperty("totalCrates");
     expect(res.body.data).toHaveProperty("rows");
     expect(Array.isArray(res.body.data.rows)).toBe(true);
   });
