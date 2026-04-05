@@ -40,6 +40,8 @@ export interface ReportsMetrics {
   paidTransactions: number;
   pendingTransactions: number;
   totalOperatingCosts: number;
+  totalCostEntries: number;
+  totalExpenses: number;
   netProfit: number;
   profitMargin: number;
 }
@@ -82,7 +84,7 @@ export function getReportDateRange(
     default:
       start.setDate(end.getDate() - 30);
   }
-  
+
   // Format dates in local timezone before returning (YYYY-MM-DD)
   const formatLocalDate = (date: Date) => {
     const year = date.getFullYear();
@@ -109,23 +111,30 @@ export function buildReportsOverviewData(input: {
   const totalEggs = productionData?.totalEggs || 0;
   const avgDaily = productionData?.avgPerDay || 0;
   const crackedEggs =
-    productionData?.logs.reduce((sum, log) => sum + (log.crackedEggs || 0), 0) ||
-    0;
+    productionData?.logs.reduce(
+      (sum, log) => sum + (log.crackedEggs || 0),
+      0,
+    ) || 0;
   const crackedPercent =
     totalEggs > 0 ? Math.round((crackedEggs / totalEggs) * 100 * 10) / 10 : 0;
 
   const totalRevenue = salesData?.totalAmount || 0;
   const totalCratesSold = salesData?.totalCrates || 0;
-  const avgPricePerCrate = totalCratesSold > 0 ? totalRevenue / totalCratesSold : 0;
+  const avgPricePerCrate =
+    totalCratesSold > 0 ? totalRevenue / totalCratesSold : 0;
   const paidTransactions =
     salesData?.rows.filter((row) => row.paymentStatus === "paid").length || 0;
   const pendingTransactions =
-    salesData?.rows.filter((row) => row.paymentStatus === "pending").length || 0;
+    salesData?.rows.filter((row) => row.paymentStatus === "pending").length ||
+    0;
 
   const totalOperatingCosts = financialData?.totalOperating || 0;
+  const totalCostEntries = financialData?.totalCostEntries || 0;
+  const totalExpenses =
+    financialData?.totalExpenses ?? totalOperatingCosts + totalCostEntries;
   // Use consistent totalSales from financial data if available, fallback to totalRevenue from sales
   const consistentRevenue = financialData?.totalSales ?? totalRevenue;
-  const netProfit = consistentRevenue - totalOperatingCosts;
+  const netProfit = consistentRevenue - totalExpenses;
   const profitMargin =
     consistentRevenue > 0
       ? Math.round((netProfit / consistentRevenue) * 100 * 10) / 10
@@ -140,7 +149,7 @@ export function buildReportsOverviewData(input: {
       range,
       productionData,
       salesData,
-      totalOperatingCosts,
+      totalExpenses,
     ),
     metrics: {
       totalEggs,
@@ -153,6 +162,8 @@ export function buildReportsOverviewData(input: {
       paidTransactions,
       pendingTransactions,
       totalOperatingCosts,
+      totalCostEntries,
+      totalExpenses,
       netProfit,
       profitMargin,
     },
@@ -168,7 +179,10 @@ function buildTopCustomers(
     return [];
   }
 
-  const customerSalesMap = new Map<number | "walk-in", { orders: number; revenue: number }>();
+  const customerSalesMap = new Map<
+    number | "walk-in",
+    { orders: number; revenue: number }
+  >();
 
   salesData.rows.forEach((sale) => {
     const key = sale.customerId || "walk-in";
@@ -211,7 +225,7 @@ function buildWeeklyReportSummary(
   range: ReportsDateRangeValues,
   productionData: ProductionReportData | null,
   salesData: SalesReportData | null,
-  totalOperatingCosts: number,
+  totalExpenses: number,
 ): WeeklyReportSummary[] {
   const rangeStart = new Date(range.startDate);
   const rangeEnd = new Date(range.endDate);
@@ -263,13 +277,13 @@ function buildWeeklyReportSummary(
     weekBuckets.set(weekIndex, existing);
   });
 
-  const dailyOperatingCost = totalOperatingCosts / totalRangeDays;
+  const dailyExpenses = totalExpenses / totalRangeDays;
 
   return Array.from(weekBuckets.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([, data]) => {
       const activeDays = Math.max(1, data.days.size);
-      const allocatedCost = dailyOperatingCost * activeDays;
+      const allocatedCost = dailyExpenses * activeDays;
 
       return {
         week: data.week,

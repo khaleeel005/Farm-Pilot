@@ -1,6 +1,7 @@
 import DailyLog from "../models/DailyLog.js";
 import Sales from "../models/Sales.js";
 import OperatingCost from "../models/OperatingCost.js";
+import CostEntry from "../models/CostEntry.js";
 import { Op } from "sequelize";
 import type { Model } from "sequelize";
 import { Parser as CsvParser } from "json2csv";
@@ -10,6 +11,7 @@ import type {
   DailyLogEntity,
   OperatingCostEntity,
   SalesEntity,
+  CostEntryEntity,
 } from "../types/entities.js";
 import type { ReportType } from "../types/dto.js";
 import { BadRequestError, InternalServerError } from "../utils/exceptions.js";
@@ -19,20 +21,29 @@ const toPlainRows = <T extends object>(rows: Model[]): T[] =>
   rows.map((row) => row.toJSON() as T);
 
 const reportService = {
-  getProductionReport: async (start: string | undefined, end: string | undefined) => {
+  getProductionReport: async (
+    start: string | undefined,
+    end: string | undefined,
+  ) => {
     if (!start || !end) throw new BadRequestError("start and end are required");
     const logs = toPlainRows<DailyLogEntity>(
       await DailyLog.findAll({
         where: { logDate: { [Op.between]: [start, end] } },
       }),
     );
-    const totalEggs = logs.reduce((s, l) => s + (Number(l.eggsCollected) || 0), 0);
+    const totalEggs = logs.reduce(
+      (s, l) => s + (Number(l.eggsCollected) || 0),
+      0,
+    );
     const days = logs.length;
     const avgPerDay = days ? totalEggs / days : 0;
     return { start, end, days, totalEggs, avgPerDay, logs };
   },
 
-  getSalesReport: async (start: string | undefined, end: string | undefined) => {
+  getSalesReport: async (
+    start: string | undefined,
+    end: string | undefined,
+  ) => {
     if (!start || !end) throw new BadRequestError("start and end are required");
     const rows = toPlainRows<SalesEntity>(
       await Sales.findAll({
@@ -41,29 +52,29 @@ const reportService = {
     );
     const totalAmount = rows.reduce(
       (s, r) => s + (Number(r.totalAmount) || 0),
-      0
+      0,
     );
-    const totalCrates = rows.reduce(
-      (s, r) => s + (Number(r.quantity) || 0),
-      0
-    );
+    const totalCrates = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
     return { start, end, totalAmount, totalCrates, rows };
   },
 
-  getFinancialReport: async (start: string | undefined, end: string | undefined) => {
+  getFinancialReport: async (
+    start: string | undefined,
+    end: string | undefined,
+  ) => {
     if (!start || !end) throw new BadRequestError("start and end are required");
     // Operating costs: Since monthYear is stored as a date (e.g., YYYY-MM-01),
     // and the incoming start/end might be mid-month, we adjust the query to include
     // any OperatingCost whose monthYear falls in the same month(s) as the start/end dates.
-    const startParts = start.split('-');
+    const startParts = start.split("-");
     const trueStart = `${startParts[0]}-${startParts[1]}-01`;
 
-    const endParts = end.split('-');
+    const endParts = end.split("-");
     const endYear = parseInt(endParts[0] || "0", 10);
     const endMonth = parseInt(endParts[1] || "0", 10);
     // getting the last day of the month accurately without timezone shifts
     const lastDay = new Date(Date.UTC(endYear, endMonth, 0)).getUTCDate();
-    const trueEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const trueEnd = `${endYear}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     const ops = toPlainRows<OperatingCostEntity>(
       await OperatingCost.findAll({
@@ -72,7 +83,7 @@ const reportService = {
     );
     const totalOperating = ops.reduce(
       (s, o) => s + (Number(o.totalMonthlyCost) || 0),
-      0
+      0,
     );
 
     // Sales total (keeps original exact date filter)
@@ -83,10 +94,45 @@ const reportService = {
     );
     const totalSales = sales.reduce(
       (s, r) => s + (Number(r.totalAmount) || 0),
-      0
+      0,
     );
 
-    return { start, end, totalOperating, totalSales, ops, sales };
+    // Cost entries: individual expense records within the exact date range
+    const costEntries = toPlainRows<CostEntryEntity>(
+      await CostEntry.findAll({
+        where: { date: { [Op.between]: [start, end] } },
+      }),
+    );
+    const totalCostEntries = costEntries.reduce(
+      (s, c) => s + (Number(c.amount) || 0),
+      0,
+    );
+
+    // Breakdown by cost type
+    const costEntriesByType = costEntries.reduce<Record<string, number>>(
+      (acc, c) => {
+        const type = c.costType || "other";
+        acc[type] = (acc[type] || 0) + (Number(c.amount) || 0);
+        return acc;
+      },
+      {},
+    );
+
+    // Total expenses = operating costs + individual cost entries
+    const totalExpenses = totalOperating + totalCostEntries;
+
+    return {
+      start,
+      end,
+      totalOperating,
+      totalCostEntries,
+      totalExpenses,
+      totalSales,
+      ops,
+      sales,
+      costEntries,
+      costEntriesByType,
+    };
   },
 
   exportReportCsv: async (
@@ -114,11 +160,24 @@ const reportService = {
       }));
     } else if (type === "financial") {
       const r = await reportService.getFinancialReport(start, end);
-      data = r.ops.map((o) => ({
+      // Export operating costs
+      const opsData = r.ops.map((o) => ({
+        type: "operating_cost",
         monthYear: o.monthYear,
         totalMonthlyCost: o.totalMonthlyCost,
         supervisorSalary: o.supervisorSalary,
       }));
+      // Export cost entries
+      const entriesData = r.costEntries.map((c) => ({
+        type: "cost_entry",
+        date: c.date,
+        costType: c.costType,
+        description: c.description,
+        amount: c.amount,
+        category: c.category,
+        vendor: c.vendor || "",
+      }));
+      data = [...opsData, ...entriesData];
     } else {
       throw new BadRequestError("unsupported export type");
     }
@@ -164,11 +223,21 @@ const reportService = {
     } else if (type === "financial") {
       title = "Financial Report";
       const r = await reportService.getFinancialReport(start, end);
-      rows = r.ops.map((o) => ({
-        monthYear: o.monthYear,
-        totalMonthlyCost: o.totalMonthlyCost,
-        supervisorSalary: o.supervisorSalary,
+      // Operating costs
+      const opsRows = r.ops.map((o) => ({
+        type: "Operating",
+        period: o.monthYear,
+        amount: o.totalMonthlyCost,
+        details: `Supervisor: ${o.supervisorSalary || 0}`,
       }));
+      // Cost entries
+      const entryRows = r.costEntries.map((c) => ({
+        type: c.costType || "Other",
+        period: c.date,
+        amount: c.amount,
+        details: c.description || "",
+      }));
+      rows = [...opsRows, ...entryRows];
     } else {
       throw new BadRequestError("unsupported export type");
     }
@@ -193,9 +262,10 @@ const reportService = {
       // Header
       const firstRow = rows[0];
       const headers = firstRow ? Object.keys(firstRow) : [];
-      
+
       // Calculate equal column width based on available page width (595 - 2*40 margins = 515)
-      const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const usableWidth =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const colWidth = headers.length > 0 ? usableWidth / headers.length : 100;
 
       // Draw Headers
@@ -203,14 +273,19 @@ const reportService = {
       headers.forEach((h, i) => {
         doc
           .font("Helvetica-Bold")
-          .text(h.toUpperCase(), doc.page.margins.left + (i * colWidth), currentY, { width: colWidth, align: "left" });
+          .text(
+            h.toUpperCase(),
+            doc.page.margins.left + i * colWidth,
+            currentY,
+            { width: colWidth, align: "left" },
+          );
       });
       doc.moveDown(0.5);
 
       // Rows
       rows.forEach((r) => {
         currentY = doc.y;
-        
+
         // Add a new page if we are too close to the bottom margin
         if (currentY > doc.page.height - doc.page.margins.bottom - 20) {
           doc.addPage();
@@ -220,7 +295,11 @@ const reportService = {
         Object.values(r).forEach((v, i) => {
           doc
             .font("Helvetica")
-            .text(String(v), doc.page.margins.left + (i * colWidth), currentY, { width: colWidth, align: "left", continued: false });
+            .text(String(v), doc.page.margins.left + i * colWidth, currentY, {
+              width: colWidth,
+              align: "left",
+              continued: false,
+            });
         });
         doc.moveDown(0.5);
       });

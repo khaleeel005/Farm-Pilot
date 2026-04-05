@@ -1,4 +1,9 @@
-import { API_BASE_URL, ApiError, fetchWithAuth, handleResponse } from "@/lib/apiClient";
+import {
+  API_BASE_URL,
+  ApiError,
+  fetchWithAuth,
+  handleResponse,
+} from "@/lib/apiClient";
 
 export interface ProductionReportData {
   start: string;
@@ -35,6 +40,8 @@ export interface FinancialReportData {
   start: string;
   end: string;
   totalOperating: number;
+  totalCostEntries: number;
+  totalExpenses: number;
   totalSales: number;
   ops: Array<{
     monthYear: string;
@@ -45,6 +52,15 @@ export interface FinancialReportData {
     saleDate: string;
     totalAmount: number;
   }>;
+  costEntries: Array<{
+    date: string;
+    costType: string;
+    description: string;
+    amount: number;
+    category?: string;
+    vendor?: string;
+  }>;
+  costEntriesByType: Record<string, number>;
 }
 
 export interface DashboardSummary {
@@ -71,7 +87,9 @@ export async function getReports(
   filters: Record<string, string> = {},
 ) {
   const params = new URLSearchParams(filters);
-  const res = await fetchWithAuth(`${API_BASE_URL}/api/reports/${type}?${params}`);
+  const res = await fetchWithAuth(
+    `${API_BASE_URL}/api/reports/${type}?${params}`,
+  );
   return handleResponse(res);
 }
 
@@ -127,9 +145,13 @@ export async function getFinancialReport(
       start: startDate,
       end: endDate,
       totalOperating: 0,
+      totalCostEntries: 0,
+      totalExpenses: 0,
       totalSales: 0,
       ops: [],
       sales: [],
+      costEntries: [],
+      costEntriesByType: {},
     }
   );
 }

@@ -49,7 +49,7 @@ import {
   type ReportsTab,
   type WeeklyReportSummary,
 } from "@/lib/reportsOverview";
-import type { ProductionReportData } from "@/lib/api";
+import type { ProductionReportData, FinancialReportData } from "@/lib/api";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -65,6 +65,8 @@ const EMPTY_METRICS: ReportsMetrics = {
   paidTransactions: 0,
   pendingTransactions: 0,
   totalOperatingCosts: 0,
+  totalCostEntries: 0,
+  totalExpenses: 0,
   netProfit: 0,
   profitMargin: 0,
 };
@@ -104,6 +106,7 @@ interface SalesTabContentProps {
 
 interface FinancialTabContentProps {
   metrics: ReportsMetrics;
+  financialData: FinancialReportData | null;
 }
 
 interface QuickExportActionsProps {
@@ -207,10 +210,7 @@ function ReportConfigurationCard({
   );
 }
 
-function OverviewTabContent({
-  metrics,
-  weeklyData,
-}: OverviewTabContentProps) {
+function OverviewTabContent({ metrics, weeklyData }: OverviewTabContentProps) {
   return (
     <TabsContent value="overview" className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -271,7 +271,9 @@ function OverviewTabContent({
           <CardTitle className="display-heading text-2xl">
             Weekly Performance Summary
           </CardTitle>
-          <CardDescription>Production, sales, and profit trends</CardDescription>
+          <CardDescription>
+            Production, sales, and profit trends
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {weeklyData.length > 0 ? (
@@ -499,13 +501,17 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
               <TableBody>
                 {topCustomers.map((customer) => (
                   <TableRow key={customer.name}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {customer.name}
+                    </TableCell>
                     <TableCell>{customer.orders}</TableCell>
                     <TableCell>₦{customer.revenue.toLocaleString()}</TableCell>
                     <TableCell>₦{customer.avgOrder.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={customer.avgOrder > 10000 ? "default" : "secondary"}
+                        variant={
+                          customer.avgOrder > 10000 ? "default" : "secondary"
+                        }
                       >
                         {customer.avgOrder > 10000 ? "Business" : "Individual"}
                       </Badge>
@@ -527,10 +533,28 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
   );
 }
 
-function FinancialTabContent({ metrics }: FinancialTabContentProps) {
+function FinancialTabContent({
+  metrics,
+  financialData,
+}: FinancialTabContentProps) {
+  const costEntriesByType = financialData?.costEntriesByType || {};
+  const expenseTypeLabels: Record<string, string> = {
+    feed: "Feed",
+    medication: "Medication",
+    transportation: "Transportation",
+    equipment: "Equipment",
+    supplies: "Supplies",
+    repairs: "Repairs",
+    fuel: "Fuel",
+    security: "Security",
+    cleaning: "Cleaning",
+    consulting: "Consulting",
+    other: "Other",
+  };
+
   return (
     <TabsContent value="financial" className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium">
@@ -554,6 +578,23 @@ function FinancialTabContent({ metrics }: FinancialTabContentProps) {
             <div className="text-lg sm:text-2xl font-bold text-destructive truncate">
               ₦{metrics.totalOperatingCosts.toLocaleString()}
             </div>
+            <p className="text-xs text-muted-foreground">Monthly overhead</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Variable Expenses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg sm:text-2xl font-bold text-destructive truncate">
+              ₦{metrics.totalCostEntries.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {Object.keys(costEntriesByType).length} expense types
+            </p>
           </CardContent>
         </Card>
 
@@ -573,65 +614,126 @@ function FinancialTabContent({ metrics }: FinancialTabContentProps) {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="display-heading text-2xl">
-            Profit & Loss Summary
-          </CardTitle>
-          <CardDescription>Financial performance overview</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
-              <span className="font-medium text-sm">Total Revenue</span>
-              <span className="text-base sm:text-lg font-bold text-chart-5">
-                ₦{metrics.totalRevenue.toLocaleString()}
-              </span>
-            </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="display-heading text-2xl">
+              Profit & Loss Summary
+            </CardTitle>
+            <CardDescription>Financial performance overview</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">Total Revenue</span>
+                <span className="text-base sm:text-lg font-bold text-chart-5">
+                  ₦{metrics.totalRevenue.toLocaleString()}
+                </span>
+              </div>
 
-            <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
-              <span className="font-medium text-sm">Total Operating Costs</span>
-              <span className="text-base sm:text-lg font-bold text-destructive">
-                ₦{metrics.totalOperatingCosts.toLocaleString()}
-              </span>
-            </div>
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">
+                  Operating Costs (Monthly)
+                </span>
+                <span className="text-base sm:text-lg font-bold text-destructive">
+                  ₦{metrics.totalOperatingCosts.toLocaleString()}
+                </span>
+              </div>
 
-            <Separator />
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">Variable Expenses</span>
+                <span className="text-base sm:text-lg font-bold text-destructive">
+                  ₦{metrics.totalCostEntries.toLocaleString()}
+                </span>
+              </div>
 
-            <div className="flex flex-col justify-between gap-2 rounded-lg border border-primary/25 bg-primary/10 p-3 sm:flex-row sm:items-center sm:p-4">
-              <span className="text-base sm:text-lg font-medium">Net Profit</span>
-              <span
-                className={`text-xl sm:text-2xl font-bold ${metrics.netProfit >= 0 ? "text-primary" : "text-destructive"}`}
-              >
-                ₦{metrics.netProfit.toLocaleString()}
-              </span>
-            </div>
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">Total Expenses</span>
+                <span className="text-base sm:text-lg font-bold text-destructive">
+                  ₦{metrics.totalExpenses.toLocaleString()}
+                </span>
+              </div>
 
-            <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
-              <span className="font-medium text-sm">Profit Margin</span>
-              <Badge
-                variant={
-                  metrics.profitMargin > 15
-                    ? "default"
-                    : metrics.profitMargin > 0
-                      ? "secondary"
-                      : "destructive"
-                }
-              >
-                {metrics.profitMargin}%
-              </Badge>
+              <Separator />
+
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-primary/25 bg-primary/10 p-3 sm:flex-row sm:items-center sm:p-4">
+                <span className="text-base sm:text-lg font-medium">
+                  Net Profit
+                </span>
+                <span
+                  className={`text-xl sm:text-2xl font-bold ${metrics.netProfit >= 0 ? "text-primary" : "text-destructive"}`}
+                >
+                  ₦{metrics.netProfit.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex flex-col justify-between gap-2 rounded-lg border border-border/70 p-3 sm:flex-row sm:items-center">
+                <span className="font-medium text-sm">Profit Margin</span>
+                <Badge
+                  variant={
+                    metrics.profitMargin > 15
+                      ? "default"
+                      : metrics.profitMargin > 0
+                        ? "secondary"
+                        : "destructive"
+                  }
+                >
+                  {metrics.profitMargin}%
+                </Badge>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="display-heading text-2xl">
+              Expense Breakdown
+            </CardTitle>
+            <CardDescription>Variable costs by type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {Object.keys(costEntriesByType).length > 0 ? (
+              <div className="space-y-3">
+                {Object.entries(costEntriesByType)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([type, amount]) => (
+                    <div
+                      key={type}
+                      className="flex items-center justify-between rounded-lg border border-border/70 p-3"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="font-medium text-sm capitalize">
+                          {expenseTypeLabels[type] || type}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {((amount / metrics.totalCostEntries) * 100).toFixed(
+                            1,
+                          )}
+                          % of expenses
+                        </p>
+                      </div>
+                      <span className="text-base font-bold text-destructive">
+                        ₦{amount.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <EmptyState
+                variant="reports"
+                title="No variable expenses"
+                description="No cost entries found for the selected period."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </TabsContent>
   );
 }
 
-function QuickExportActions({
-  exporting,
-  onExport,
-}: QuickExportActionsProps) {
+function QuickExportActions({ exporting, onExport }: QuickExportActionsProps) {
   const exportButtons: Array<{
     format: ReportsExportFormat;
     label: string;
@@ -689,7 +791,9 @@ export function ReportsSection() {
   const toast = useToastContext();
 
   const range = data?.range ?? getReportDateRange(dateRange);
-  const productionData = (data?.productionData ?? null) as ProductionReportData | null;
+  const productionData = (data?.productionData ??
+    null) as ProductionReportData | null;
+  const financialData = data?.financialData ?? null;
   const topCustomers = data?.topCustomers ?? [];
   const weeklyData = data?.weeklyData ?? [];
   const metrics = data?.metrics ?? EMPTY_METRICS;
@@ -701,7 +805,12 @@ export function ReportsSection() {
     setExporting(true);
 
     try {
-      const blob = await exportReport(type, format, range.startDate, range.endDate);
+      const blob = await exportReport(
+        type,
+        format,
+        range.startDate,
+        range.endDate,
+      );
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -736,7 +845,8 @@ export function ReportsSection() {
   }
 
   // Derive the active tab safely for the export button
-  const currentExportTab: ReportsTab = activeTab === "overview" ? reportType : (activeTab as ReportsTab);
+  const currentExportTab: ReportsTab =
+    activeTab === "overview" ? reportType : (activeTab as ReportsTab);
 
   return (
     <div className="space-y-6">
@@ -767,8 +877,8 @@ export function ReportsSection() {
         reportType={currentExportTab}
       />
 
-      <Tabs 
-        value={activeTab} 
+      <Tabs
+        value={activeTab}
         onValueChange={setActiveTab}
         className="space-y-6"
       >
@@ -788,9 +898,12 @@ export function ReportsSection() {
         </TabsList>
 
         <OverviewTabContent metrics={metrics} weeklyData={weeklyData} />
-        <ProductionTabContent metrics={metrics} productionData={productionData} />
+        <ProductionTabContent
+          metrics={metrics}
+          productionData={productionData}
+        />
         <SalesTabContent metrics={metrics} topCustomers={topCustomers} />
-        <FinancialTabContent metrics={metrics} />
+        <FinancialTabContent metrics={metrics} financialData={financialData} />
       </Tabs>
 
       {canExport && (
