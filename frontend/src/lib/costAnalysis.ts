@@ -143,31 +143,35 @@ export function getProfitabilityLabel(profitMargin: number): string {
   return "Waiting for pricing data";
 }
 
-export function getPricingInsights(profitMargin: number): string[] {
-  if (profitMargin > 20) {
+export function getPricingInsights(input: {
+  avgSellingPrice: number;
+  profitPerEgg: number;
+  suggestedPrice: number;
+}): string[] {
+  if (input.avgSellingPrice <= 0) {
     return [
-      "Your pricing strategy is generating healthy margins.",
-      "Consider maintaining prices during high-demand periods.",
+      "Record paid sales to compare your live selling price against cost.",
+      `Suggested price is currently ₦${input.suggestedPrice.toFixed(2)} per egg.`,
     ];
   }
 
-  if (profitMargin > 10) {
+  if (input.profitPerEgg > 0) {
     return [
-      "Margins are acceptable but could be improved.",
-      "Consider a slight price increase if demand stays steady.",
+      `Current average selling price is yielding ₦${input.profitPerEgg.toFixed(2)} profit per egg.`,
+      `Suggested price based on current cost is ₦${input.suggestedPrice.toFixed(2)} per egg.`,
     ];
   }
 
-  if (profitMargin > 0) {
+  if (input.profitPerEgg < 0) {
     return [
-      "Current margins are below target.",
-      "Review pricing or look for cost-reduction opportunities.",
+      `Current average selling price is ₦${Math.abs(input.profitPerEgg).toFixed(2)} below cost per egg.`,
+      `Suggested price based on current cost is ₦${input.suggestedPrice.toFixed(2)} per egg.`,
     ];
   }
 
   return [
-    "Record sales to unlock pricing insights.",
-    "Suggested prices already include a recommended markup.",
+    "Current average selling price is matching cost per egg.",
+    `Suggested price based on current cost is ₦${input.suggestedPrice.toFixed(2)} per egg.`,
   ];
 }
 
@@ -212,6 +216,10 @@ export function buildCostAnalysisOverviewData(input: {
     pricingRecommendation,
     profitPerEgg,
     profitMargin,
-    pricingInsights: getPricingInsights(profitMargin),
+    pricingInsights: getPricingInsights({
+      avgSellingPrice,
+      profitPerEgg,
+      suggestedPrice: fallbackSuggestedPrice,
+    }),
   };
 }

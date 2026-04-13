@@ -41,11 +41,14 @@ import {
   buildSalePayload,
   calculateSaleFormTotal,
   createEmptyCustomerForm,
+  createEmptySalesListFilters,
   createEmptySaleForm,
+  filterSales,
   getTodayDateValue,
   getRecentSales,
   type CustomerFormData,
   type SaleFormData,
+  type SalesListFilters,
 } from "@/lib/salesManagement";
 import {
   Dialog,
@@ -99,6 +102,9 @@ export function SalesManagement() {
   );
   const [customerForm, setCustomerForm] = useState<CustomerFormData>(() =>
     createEmptyCustomerForm(),
+  );
+  const [salesFilters, setSalesFilters] = useState<SalesListFilters>(() =>
+    createEmptySalesListFilters(),
   );
   const toast = useToastContext();
 
@@ -185,7 +191,28 @@ export function SalesManagement() {
   const customerNames = useMemo(() => {
     return new Map(customers.map((customer) => [customer.id, customer]));
   }, [customers]);
-  const recentSales = useMemo(() => getRecentSales(sales), [sales]);
+  const filteredSales = useMemo(
+    () => filterSales(sales, salesFilters),
+    [sales, salesFilters],
+  );
+  const recentSales = useMemo(
+    () => getRecentSales(filteredSales),
+    [filteredSales],
+  );
+
+  const handleSalesFilterChange = useCallback(
+    (field: keyof SalesListFilters, value: string) => {
+      setSalesFilters((currentFilters) => ({
+        ...currentFilters,
+        [field]: value,
+      }));
+    },
+    [],
+  );
+
+  const clearSalesFilters = useCallback(() => {
+    setSalesFilters(createEmptySalesListFilters());
+  }, []);
 
   const handleMarkAsPaid = useCallback(
     async (sale: Sale) => {
@@ -585,6 +612,93 @@ export function SalesManagement() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-border/70 bg-background/55 p-4 xl:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="sales-filter-customer">Customer</Label>
+                <Select
+                  value={salesFilters.customerId}
+                  onValueChange={(value) =>
+                    handleSalesFilterChange("customerId", value)
+                  }
+                >
+                  <SelectTrigger id="sales-filter-customer">
+                    <SelectValue placeholder="All customers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All customers</SelectItem>
+                    <SelectItem value="walk-in">Walk-in only</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={String(customer.id)}>
+                        {customer.customerName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sales-filter-status">Payment Status</Label>
+                <Select
+                  value={salesFilters.paymentStatus}
+                  onValueChange={(value) =>
+                    handleSalesFilterChange("paymentStatus", value)
+                  }
+                >
+                  <SelectTrigger id="sales-filter-status">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sales-filter-start">Start Date</Label>
+                <Input
+                  id="sales-filter-start"
+                  type="date"
+                  value={salesFilters.startDate}
+                  onChange={(event) =>
+                    handleSalesFilterChange("startDate", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sales-filter-end">End Date</Label>
+                <Input
+                  id="sales-filter-end"
+                  type="date"
+                  value={salesFilters.endDate}
+                  onChange={(event) =>
+                    handleSalesFilterChange("endDate", event.target.value)
+                  }
+                />
+              </div>
+
+              <div className="xl:col-span-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Showing {recentSales.length} of {sales.length} sale
+                  {sales.length === 1 ? "" : "s"}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={clearSalesFilters}
+                  disabled={
+                    salesFilters.customerId === "all" &&
+                    salesFilters.paymentStatus === "all" &&
+                    !salesFilters.startDate &&
+                    !salesFilters.endDate
+                  }
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+
             {recentSales.length > 0 ? (
               <div className="max-h-[480px] overflow-y-auto">
                 <Table>
@@ -618,8 +732,12 @@ export function SalesManagement() {
             ) : (
               <EmptyState
                 variant="sales"
-                title="No sales recorded yet"
-                description="Click 'New Sale' to record your first sale."
+                title={sales.length > 0 ? "No sales match these filters" : "No sales recorded yet"}
+                description={
+                  sales.length > 0
+                    ? "Adjust the filters to see more transactions."
+                    : "Click 'New Sale' to record your first sale."
+                }
                 actionLabel={canCreateSale ? "New Sale" : undefined}
                 onAction={
                   canCreateSale ? () => setShowNewSale(true) : undefined

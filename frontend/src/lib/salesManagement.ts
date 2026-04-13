@@ -22,6 +22,13 @@ export interface CustomerFormData {
   customerType: string;
 }
 
+export interface SalesListFilters {
+  customerId: string;
+  endDate: string;
+  paymentStatus: "all" | "paid" | "pending";
+  startDate: string;
+}
+
 export interface SalesOverviewMetrics {
   todayRevenue: number;
   todaySalesCount: number;
@@ -53,6 +60,15 @@ export function createEmptyCustomerForm(): CustomerFormData {
     email: "",
     address: "",
     customerType: "individual",
+  };
+}
+
+export function createEmptySalesListFilters(): SalesListFilters {
+  return {
+    customerId: "all",
+    endDate: "",
+    paymentStatus: "all",
+    startDate: "",
   };
 }
 
@@ -144,5 +160,36 @@ export function getRecentSales(sales: Sale[]): Sale[] {
     }
 
     return String(right.saleDate).localeCompare(String(left.saleDate));
+  });
+}
+
+export function filterSales(
+  sales: Sale[],
+  filters: SalesListFilters,
+): Sale[] {
+  return sales.filter((sale) => {
+    if (filters.customerId !== "all") {
+      if (filters.customerId === "walk-in") {
+        if (sale.customerId != null) {
+          return false;
+        }
+      } else if (String(sale.customerId ?? "") !== filters.customerId) {
+        return false;
+      }
+    }
+
+    if (filters.paymentStatus !== "all" && sale.paymentStatus !== filters.paymentStatus) {
+      return false;
+    }
+
+    if (filters.startDate && sale.saleDate < filters.startDate) {
+      return false;
+    }
+
+    if (filters.endDate && sale.saleDate > filters.endDate) {
+      return false;
+    }
+
+    return true;
   });
 }
