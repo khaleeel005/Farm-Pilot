@@ -16,9 +16,11 @@ export type ReportsExportFormat = "csv" | "pdf";
 export type ReportsTab = "production" | "sales" | "financial";
 
 export interface CustomerSummary {
+  avgOrderComparison: "above" | "below" | "equal";
   name: string;
   orders: number;
   revenue: number;
+  revenueShare: number;
   avgOrder: number;
 }
 
@@ -45,6 +47,18 @@ export interface ReportsMetrics {
   totalExpenses: number;
   netProfit: number;
   profitMargin: number;
+}
+
+export function getProfitStatusLabel(metrics: Pick<ReportsMetrics, "netProfit" | "profitMargin">): string {
+  if (metrics.netProfit > 0) {
+    return `${metrics.profitMargin}% margin in selected period`;
+  }
+
+  if (metrics.netProfit < 0) {
+    return "Operating at a loss in selected period";
+  }
+
+  return "Break-even for selected period";
 }
 
 export interface ReportsDateRangeValues {
@@ -203,6 +217,10 @@ function buildTopCustomers(
   });
 
   const summaries: CustomerSummary[] = [];
+  const overallAverageOrderValue =
+    salesData.totalCrates > 0
+      ? salesData.totalAmount / Math.max(1, salesData.rows.length)
+      : 0;
 
   customerSalesMap.forEach((value, key) => {
     let name = "Walk-in Customers";
@@ -214,11 +232,24 @@ function buildTopCustomers(
       name = customer.customerName;
     }
 
+    const avgOrder =
+      value.orders > 0 ? Math.round(value.revenue / value.orders) : 0;
+
     summaries.push({
+      avgOrderComparison:
+        avgOrder > overallAverageOrderValue
+          ? "above"
+          : avgOrder < overallAverageOrderValue
+            ? "below"
+            : "equal",
       name,
       orders: value.orders,
       revenue: value.revenue,
-      avgOrder: value.orders > 0 ? Math.round(value.revenue / value.orders) : 0,
+      revenueShare:
+        salesData.totalAmount > 0
+          ? Math.round((value.revenue / salesData.totalAmount) * 1000) / 10
+          : 0,
+      avgOrder,
     });
   });
 

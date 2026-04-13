@@ -20,7 +20,9 @@ export interface MonthlyProjection {
   avgCostPerEgg: number;
   avgDailyProduction: number;
   avgSellingPrice: number;
+  daysInProjection: number;
   monthlyProfit: number;
+  projectedEggs: number;
   profitPerEgg: number;
 }
 
@@ -55,6 +57,22 @@ const DEFAULT_MARKUP = 20;
 function toNumber(value: unknown): number {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function getDaysInMonth(date: string | undefined): number {
+  if (!date) {
+    return 30;
+  }
+
+  const [yearValue, monthValue] = date.split("-");
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return 30;
+  }
+
+  return new Date(year, month, 0).getDate();
 }
 
 export function getTodayIsoDate(): string {
@@ -113,6 +131,18 @@ export function getProfitMargin(
     : 0;
 }
 
+export function getProfitabilityLabel(profitMargin: number): string {
+  if (profitMargin > 0) {
+    return "Profitable at current pricing";
+  }
+
+  if (profitMargin < 0) {
+    return "Current pricing is below cost";
+  }
+
+  return "Waiting for pricing data";
+}
+
 export function getPricingInsights(profitMargin: number): string[] {
   if (profitMargin > 20) {
     return [
@@ -148,21 +178,27 @@ export function buildCostAnalysisOverviewData(input: {
   const costBreakdown = buildCostBreakdown(input.costEstimate);
   const avgSellingPrice = calculateAverageSellingPrice(input.sales);
   const fallbackSuggestedPrice = toNumber(input.costEstimate?.suggestedPrice);
-  const effectiveSellingPrice = avgSellingPrice;
+  const effectiveSellingPrice = avgSellingPrice || fallbackSuggestedPrice;
   const profitPerEgg = effectiveSellingPrice - costBreakdown.total;
   const avgDailyProduction = toNumber(input.costEstimate?.avgDailyProduction);
+  const avgMonthlyProduction = toNumber(input.costEstimate?.avgMonthlyProduction);
+  const daysInProjection = getDaysInMonth(input.costEstimate?.date);
+  const projectedEggs =
+    avgMonthlyProduction || avgDailyProduction * daysInProjection;
   const monthlyProjection: MonthlyProjection = {
     avgDailyProduction,
     avgCostPerEgg: costBreakdown.total,
     avgSellingPrice: effectiveSellingPrice,
+    daysInProjection,
+    projectedEggs,
     profitPerEgg,
-    monthlyProfit: profitPerEgg * avgDailyProduction * 30,
+    monthlyProfit: profitPerEgg * projectedEggs,
   };
   const pricingRecommendation: PricingData = {
     cost: costBreakdown.total,
     markup: DEFAULT_MARKUP,
     suggested: fallbackSuggestedPrice,
-    current: effectiveSellingPrice,
+    current: avgSellingPrice,
   };
   const profitMargin = getProfitMargin(effectiveSellingPrice, profitPerEgg);
 

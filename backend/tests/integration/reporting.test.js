@@ -9,6 +9,8 @@ describe("Reporting Flow", () => {
   let houseId;
   let customerId;
   let feedBatchId;
+  const nonFeedExpenseAmount = 1500;
+  const feedExpenseAmount = 900;
 
   beforeAll(async () => {
     await autoMigrate();
@@ -112,6 +114,22 @@ describe("Reporting Flow", () => {
         paymentStatus: "paid",
       });
     }
+
+    await auth(ownerToken)(request(app).post("/api/cost-entries")).send({
+      date: "2025-08-10",
+      costType: "medication",
+      description: "Vaccination supplies",
+      amount: nonFeedExpenseAmount,
+      category: "operational",
+    });
+
+    await auth(ownerToken)(request(app).post("/api/cost-entries")).send({
+      date: "2025-08-11",
+      costType: "feed",
+      description: "Manual feed purchase",
+      amount: feedExpenseAmount,
+      category: "operational",
+    });
   };
 
   const auth = (token) => (req) =>
@@ -170,8 +188,17 @@ describe("Reporting Flow", () => {
     expect(res.body.data).toHaveProperty("totalCostEntries");
     expect(res.body.data).toHaveProperty("totalFeedCost");
     expect(Number(res.body.data.totalFeedCost)).toBeGreaterThan(0);
+    expect(Number(res.body.data.totalCostEntries)).toBeCloseTo(
+      nonFeedExpenseAmount,
+      5
+    );
     expect(res.body.data).toHaveProperty("feedCostByBatch");
     expect(res.body.data.feedCostByBatch).toHaveProperty("Reports Test Batch");
+    expect(res.body.data.costEntriesByType).toHaveProperty(
+      "medication",
+      nonFeedExpenseAmount
+    );
+    expect(res.body.data.costEntriesByType).not.toHaveProperty("feed");
 
     const feedBreakdownTotal = Object.values(res.body.data.feedCostByBatch).reduce(
       (sum, amount) => sum + (Number(amount) || 0),

@@ -21,7 +21,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { ErrorState } from "@/components/shared/error-state";
 import { useCostAnalysisOverview } from "@/hooks";
-import { getCostBreakdownItems } from "@/lib/costAnalysis";
+import {
+  getCostBreakdownItems,
+  getProfitabilityLabel,
+} from "@/lib/costAnalysis";
 
 const emptyCostBreakdown = {
   birdCost: 0,
@@ -43,7 +46,9 @@ const emptyMonthlyProjection = {
   avgDailyProduction: 0,
   avgCostPerEgg: 0,
   avgSellingPrice: 0,
+  daysInProjection: 30,
   profitPerEgg: 0,
+  projectedEggs: 0,
   monthlyProfit: 0,
 };
 
@@ -151,9 +156,9 @@ export function CostAnalysis() {
                 : "N/A"}
             </div>
             <div className="text-xs text-muted-foreground">
-              {avgDailyProduction > 0
-                ? `${avgDailyProduction.toFixed(0)} eggs/day avg`
-                : "Based on 30 days"}
+              {monthlyProjection.projectedEggs > 0
+                ? `${monthlyProjection.projectedEggs.toFixed(0)} eggs projected this month`
+                : "Waiting for production history"}
             </div>
           </CardContent>
         </Card>
@@ -168,11 +173,7 @@ export function CostAnalysis() {
               {profitMargin !== 0 ? `${profitMargin.toFixed(1)}%` : "N/A"}
             </div>
             <div className="text-xs text-muted-foreground">
-              {profitMargin > 15
-                ? "Above industry average"
-                : profitMargin > 0
-                  ? "Below target"
-                  : "Set prices first"}
+              {getProfitabilityLabel(profitMargin)}
             </div>
           </CardContent>
         </Card>
@@ -371,7 +372,7 @@ export function CostAnalysis() {
                   })}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  30 days projection
+                  {monthlyProjection.daysInProjection} day projection
                 </div>
               </div>
             </div>

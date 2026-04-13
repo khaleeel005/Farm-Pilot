@@ -285,6 +285,7 @@ const costService = {
       date,
       avgMonthlyProduction,
       avgDailyProduction,
+      birdCostPerEgg: healthCostPerEgg,
       feedCostPerEgg,
       laborCostPerEgg,
       fixedCostPerEgg,
@@ -363,6 +364,7 @@ const costService = {
       return {
         date,
         totalEggs: 0,
+        birdCostPerEgg: 0,
         feedCostPerEgg: 0,
         laborCostPerEgg: 0,
         fixedCostPerEgg: 0,
@@ -448,6 +450,7 @@ const costService = {
     return {
       date,
       totalEggs,
+      birdCostPerEgg: healthCostPerEgg,
       feedCostPerEgg,
       laborCostPerEgg,
       fixedCostPerEgg,

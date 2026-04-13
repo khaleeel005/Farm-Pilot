@@ -89,8 +89,11 @@ export interface LaborAssignmentFiltersInput {
 export interface SalesFiltersInput {
   date?: string;
   saleDate?: string;
+  startDate?: string;
+  endDate?: string;
   customer?: string | number;
   customerId?: string | number;
+  paymentStatus?: SalesEntity["paymentStatus"];
 }
 
 export interface SalesUpdateInput extends Partial<SalesEntity> {}

@@ -41,6 +41,7 @@ import { useResourcePermissions, useToastContext } from "@/hooks";
 import { useReportsOverview } from "@/hooks/useReportsOverview";
 import { exportReport } from "@/lib/api";
 import {
+  getProfitStatusLabel,
   getReportDateRange,
   type CustomerSummary,
   type ReportsDateRange,
@@ -261,7 +262,7 @@ function OverviewTabContent({ metrics, weeklyData }: OverviewTabContentProps) {
               {metrics.profitMargin}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {metrics.profitMargin > 15 ? "Above" : "Below"} industry average
+              {getProfitStatusLabel(metrics)}
             </p>
           </CardContent>
         </Card>
@@ -496,7 +497,7 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
                   <TableHead>Orders</TableHead>
                   <TableHead>Total Revenue</TableHead>
                   <TableHead>Avg Order</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Revenue Share</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -511,10 +512,14 @@ function SalesTabContent({ metrics, topCustomers }: SalesTabContentProps) {
                     <TableCell>
                       <Badge
                         variant={
-                          customer.avgOrder > 10000 ? "default" : "secondary"
+                          customer.avgOrderComparison === "above"
+                            ? "default"
+                            : customer.avgOrderComparison === "equal"
+                              ? "outline"
+                              : "secondary"
                         }
                       >
-                        {customer.avgOrder > 10000 ? "Business" : "Individual"}
+                        {customer.revenueShare.toFixed(1)}%
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -704,9 +709,9 @@ function FinancialTabContent({
                 <span className="font-medium text-sm">Profit Margin</span>
                 <Badge
                   variant={
-                    metrics.profitMargin > 15
+                    metrics.netProfit > 0
                       ? "default"
-                      : metrics.profitMargin > 0
+                      : metrics.netProfit === 0
                         ? "secondary"
                         : "destructive"
                   }

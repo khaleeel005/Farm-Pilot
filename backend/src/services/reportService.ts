@@ -105,13 +105,17 @@ const reportService = {
         where: { date: { [Op.between]: [start, end] } },
       }),
     );
-    const totalCostEntries = costEntries.reduce(
+    const nonFeedCostEntries = costEntries.filter(
+      (entry) => entry.costType !== "feed",
+    );
+
+    const totalCostEntries = nonFeedCostEntries.reduce(
       (s, c) => s + (Number(c.amount) || 0),
       0,
     );
 
     // Breakdown by cost type
-    const costEntriesByType = costEntries.reduce<Record<string, number>>(
+    const costEntriesByType = nonFeedCostEntries.reduce<Record<string, number>>(
       (acc, c) => {
         const type = c.costType || "other";
         acc[type] = (acc[type] || 0) + (Number(c.amount) || 0);
@@ -174,7 +178,7 @@ const reportService = {
       totalSales,
       ops,
       sales,
-      costEntries,
+      costEntries: nonFeedCostEntries,
       costEntriesByType,
       feedCostByBatch,
     };

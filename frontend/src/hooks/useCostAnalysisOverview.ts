@@ -13,7 +13,7 @@ async function fetchCostAnalysisOverview(
 ): Promise<CostAnalysisOverviewData> {
   const [costEstimate, sales] = await Promise.all([
     getEggPriceEstimate(date).catch(() => null),
-    getSales({ limit: "100" }).catch(() => []),
+    getSales().catch(() => []),
   ]);
 
   return buildCostAnalysisOverviewData({

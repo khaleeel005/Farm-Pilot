@@ -103,7 +103,7 @@ export function buildDashboardOverviewData({
       (log: DailyLog) => Number(log.houseId) === house.id,
     );
     const houseEggs = sumEggs(houseLogs);
-    const capacity = house.currentBirdCount || house.capacity || 100;
+    const capacity = house.currentBirdCount || house.capacity || 0;
     const efficiency =
       capacity > 0 ? Math.min(100, Math.round((houseEggs / capacity) * 100)) : 0;
 
