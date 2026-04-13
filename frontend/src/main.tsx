@@ -76,9 +76,25 @@ function InnerApp() {
   );
 }
 
+function registerServiceWorker() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!("serviceWorker" in navigator) || import.meta.env.DEV) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register(`/sw.js?v=${__APP_VERSION__}`);
+  });
+}
+
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
+
+registerServiceWorker();
 
 root.render(
   <React.StrictMode>

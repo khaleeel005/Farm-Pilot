@@ -4,6 +4,7 @@ import { TanStackRouterRspack } from "@tanstack/router-plugin/rspack";
 import path from "path";
 
 const apiUrl = process.env.API_URL;
+const appVersion = process.env.npm_package_version ?? "1.0.0";
 
 if (!apiUrl) {
   throw new Error("API_URL must be set");
@@ -46,6 +47,7 @@ export default defineConfig({
       index: "./src/main.tsx",
     },
     define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
       "process.env.API_URL": JSON.stringify(apiUrl),
     },
   },

@@ -1,0 +1,25 @@
+{
+  "name": "Farm Manager",
+  "short_name": "FarmMgr",
+  "description": "Manage daily production, sales, inventory, costs, and reporting for your farm.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f3ea",
+  "theme_color": "#5f7240",
+  "icons": [
+    {
+      "src": "/brand-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
