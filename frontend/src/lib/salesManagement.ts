@@ -116,3 +116,33 @@ export function calculateSalesOverview(
     totalCustomers: customers.length,
   };
 }
+
+function getSaleSortTimestamp(sale: Sale): number {
+  const createdAt = sale.createdAt ? Date.parse(sale.createdAt) : NaN;
+  if (Number.isFinite(createdAt)) {
+    return createdAt;
+  }
+
+  const saleDate = sale.saleDate ? Date.parse(`${sale.saleDate}T00:00:00`) : NaN;
+  if (Number.isFinite(saleDate)) {
+    return saleDate;
+  }
+
+  return 0;
+}
+
+export function getRecentSales(sales: Sale[]): Sale[] {
+  return [...sales].sort((left, right) => {
+    const timeDifference = getSaleSortTimestamp(right) - getSaleSortTimestamp(left);
+    if (timeDifference !== 0) {
+      return timeDifference;
+    }
+
+    const idDifference = (right.id || 0) - (left.id || 0);
+    if (idDifference !== 0) {
+      return idDifference;
+    }
+
+    return String(right.saleDate).localeCompare(String(left.saleDate));
+  });
+}

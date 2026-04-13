@@ -43,6 +43,7 @@ import {
   createEmptyCustomerForm,
   createEmptySaleForm,
   getTodayDateValue,
+  getRecentSales,
   type CustomerFormData,
   type SaleFormData,
 } from "@/lib/salesManagement";
@@ -184,6 +185,7 @@ export function SalesManagement() {
   const customerNames = useMemo(() => {
     return new Map(customers.map((customer) => [customer.id, customer]));
   }, [customers]);
+  const recentSales = useMemo(() => getRecentSales(sales), [sales]);
 
   const handleMarkAsPaid = useCallback(
     async (sale: Sale) => {
@@ -576,37 +578,43 @@ export function SalesManagement() {
             <CardTitle className="display-heading text-2xl">
               Recent Sales
             </CardTitle>
-            <CardDescription>Latest sales transactions</CardDescription>
+            <CardDescription>
+              {recentSales.length > 0
+                ? `${Math.min(recentSales.length, 12)} newest transactions, shown in descending order`
+                : "Latest sales transactions"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {sales.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Crates</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sales.slice(0, 10).map((sale) => (
-                    <SaleRow
-                      key={sale.id}
-                      canMarkPaid={canUpdateSale}
-                      sale={sale}
-                      customer={sale.customerId != null ? customerNames.get(sale.customerId) : undefined}
-                      markingAsPaid={
-                        isUpdatingSale && updatingSaleId === sale.id
-                      }
-                      onMarkAsPaid={handleMarkAsPaid}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+            {recentSales.length > 0 ? (
+              <div className="max-h-[480px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Crates</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentSales.slice(0, 12).map((sale) => (
+                      <SaleRow
+                        key={sale.id}
+                        canMarkPaid={canUpdateSale}
+                        sale={sale}
+                        customer={sale.customerId != null ? customerNames.get(sale.customerId) : undefined}
+                        markingAsPaid={
+                          isUpdatingSale && updatingSaleId === sale.id
+                        }
+                        onMarkAsPaid={handleMarkAsPaid}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
               <EmptyState
                 variant="sales"
@@ -690,7 +698,7 @@ function SaleRow({
   return (
     <TableRow>
       <TableCell className="font-medium">#{sale.id}</TableCell>
-      <TableCell>{sale.customer?.customerName || customer?.customerName || "Unknown"}</TableCell>
+      <TableCell>{sale.customer?.customerName || customer?.customerName || "Walk-in"}</TableCell>
       <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
       <TableCell>
         {totalCrates}

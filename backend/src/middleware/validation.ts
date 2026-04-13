@@ -236,6 +236,18 @@ export const validateSalesQueries = [
     .optional()
     .isISO8601()
     .withMessage("date must be a valid date (YYYY-MM-DD)"),
+  query("saleDate")
+    .optional()
+    .isISO8601()
+    .withMessage("saleDate must be a valid date (YYYY-MM-DD)"),
+  query("startDate")
+    .optional()
+    .isISO8601()
+    .withMessage("startDate must be a valid date (YYYY-MM-DD)"),
+  query("endDate")
+    .optional()
+    .isISO8601()
+    .withMessage("endDate must be a valid date (YYYY-MM-DD)"),
   query("customer")
     .optional()
     .isInt({ min: 1 })
@@ -244,6 +256,10 @@ export const validateSalesQueries = [
     .optional()
     .isInt({ min: 1 })
     .withMessage("customerId must be a positive integer"),
+  query("paymentStatus")
+    .optional()
+    .isIn(["paid", "pending"])
+    .withMessage("paymentStatus must be paid or pending"),
 ];
 
 export const validateId = [

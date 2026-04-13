@@ -3,6 +3,7 @@ import { NotFoundError, BadRequestError } from "../utils/exceptions.js";
 import type { SalesEntity } from "../types/entities.js";
 import type { SalesFiltersInput, SalesUpdateInput } from "../types/dto.js";
 import { sequelize } from "../utils/database.js";
+import { Op } from "sequelize";
 
 const SALES_MUTABLE_FIELDS = [
   "saleDate",
@@ -79,12 +80,20 @@ const salesService = {
   },
 
   getAllSales: async (filters: SalesFiltersInput = {}) => {
-    const where: { saleDate?: string; customerId?: number } = {};
+    const where: {
+      saleDate?: string | { [Op.between]: [string, string] };
+      customerId?: number;
+      paymentStatus?: SalesEntity["paymentStatus"];
+    } = {};
 
     // Filter by date
     const date = filters.date || filters.saleDate;
     if (date) {
       where.saleDate = date;
+    } else if (filters.startDate && filters.endDate) {
+      where.saleDate = {
+        [Op.between]: [filters.startDate, filters.endDate],
+      };
     }
 
     // Filter by customer
@@ -93,7 +102,18 @@ const salesService = {
       if (!Number.isNaN(customerId)) where.customerId = customerId;
     }
 
-    const sales = await Sales.findAll({ where });
+    if (filters.paymentStatus === "paid" || filters.paymentStatus === "pending") {
+      where.paymentStatus = filters.paymentStatus;
+    }
+
+    const sales = await Sales.findAll({
+      where,
+      order: [
+        ["saleDate", "DESC"],
+        ["createdAt", "DESC"],
+        ["id", "DESC"],
+      ],
+    });
     return sales;
   },
 
